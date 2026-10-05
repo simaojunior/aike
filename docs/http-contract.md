@@ -24,6 +24,32 @@ biometrics:read   GET  /v1/facematch/:id
 O endpoint síncrono do classifier usa `ocr:write`. Não existem escopos de update ou
 delete. `company_id` é sempre derivado da conta autenticada.
 
+## Provisionamento temporário
+
+Durante o desenvolvimento, estes endpoints administrativos permanecem sem
+autenticação para permitir o bootstrap inicial:
+
+```http
+POST /v1/companies
+Content-Type: application/json
+
+{"name":"Acme"}
+```
+
+A resposta `201` contém um `id` UUID. Use esse UUID para criar uma Service Account:
+
+```http
+POST /v1/service-accounts
+Content-Type: application/json
+
+{"companyId":"<company-uuid>","name":"Acme Development","scopes":["ocr:write","ocr:read"]}
+```
+
+A resposta `201` contém o `accountId` e o `secret` em texto puro uma única vez. O
+segredo não é persistido; somente seu hash é armazenado. Esses endpoints devem
+receber autenticação administrativa antes de qualquer ambiente compartilhado ou
+produção.
+
 As colunas e estruturas internas usam `snake_case`. Todas as respostas JSON passam
 por conversão recursiva para `camelCase` (`runId`, `documentType`, `processingTimeMs`).
 
