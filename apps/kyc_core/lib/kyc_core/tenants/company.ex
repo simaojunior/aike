@@ -5,7 +5,7 @@ defmodule KycCore.Tenants.Company do
   import Ecto.Changeset
 
   @primary_key {:id, :binary_id, autogenerate: true}
-  @type t :: %__MODULE__{id: Ecto.UUID.t(), name: String.t() | nil, active: boolean()}
+  @type t :: %__MODULE__{id: Ecto.UUID.t() | nil, name: String.t() | nil, active: boolean()}
 
   schema "companies" do
     field(:name, :string)
