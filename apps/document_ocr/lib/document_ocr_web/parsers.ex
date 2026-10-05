@@ -3,10 +3,8 @@ defmodule DocumentOcrWeb.Parsers do
 
   import Plug.Conn
 
-  @spec init(keyword()) :: Plug.Parsers.parser()
   def init(opts), do: Plug.Parsers.init(opts)
 
-  @spec call(Plug.Conn.t(), Plug.Parsers.parser()) :: Plug.Conn.t()
   def call(conn, opts) do
     Plug.Parsers.call(conn, opts)
   rescue
