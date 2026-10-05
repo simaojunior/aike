@@ -47,6 +47,31 @@ inicializado brevemente com PostgreSQL 17 foi preservado e não é utilizado pel
 
 ## API e teste manual
 
+### Provisionar credenciais locais
+
+Empresas e Service Accounts são criadas fora dos endpoints públicos. O segredo da
+Service Account é gerado somente durante o provisionamento e não pode ser recuperado
+depois:
+
+```bash
+mix ecto.migrate -r DocumentOcr.Repo
+mix aike.company.create acme Acme
+mix aike.service_account.create \
+  acme "Acme Development" \
+  ocr:write,ocr:read,biometrics:write,biometrics:read
+```
+
+O segundo comando imprime o `account_id` e o `secret`. Guarde o segredo e use-o nas
+requisições autenticadas:
+
+```text
+Authorization: ApiKey <account_id>:<secret>
+```
+
+O segredo nunca é salvo em texto puro. A tabela armazena apenas um hash PBKDF2, e os
+escopos permitidos são `ocr:write`, `ocr:read`, `biometrics:write` e
+`biometrics:read`. Não existem escopos de update ou delete.
+
 Em outro terminal, com a API em execução:
 
 ```bash
