@@ -72,6 +72,10 @@ O segredo nunca é salvo em texto puro. A tabela armazena apenas um hash PBKDF2,
 escopos permitidos são `ocr:write`, `ocr:read`, `biometrics:write` e
 `biometrics:read`. Não existem escopos de update ou delete.
 
+Para habilitar a validação de `Authorization` durante o desenvolvimento local, inicie
+o servidor com `AIKE_AUTH_REQUIRED=true`. Sem essa variável, a autenticação permanece
+desligada para facilitar testes iniciais.
+
 Em outro terminal, com a API em execução:
 
 ```bash
