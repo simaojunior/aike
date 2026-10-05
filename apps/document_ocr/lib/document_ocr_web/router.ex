@@ -10,6 +10,11 @@ defmodule DocumentOcrWeb.Router do
   end
 
   scope "/v1" do
+    post("/companies", DocumentOcrWeb.ProvisioningController, :create_company)
+    post("/service-accounts", DocumentOcrWeb.ProvisioningController, :create_service_account)
+  end
+
+  scope "/v1" do
     pipe_through(:ocr_write)
     post("/documents", DocumentOcrWeb.DocumentController, :create)
     post("/documents/:id/reprocess", DocumentOcrWeb.DocumentController, :reprocess)

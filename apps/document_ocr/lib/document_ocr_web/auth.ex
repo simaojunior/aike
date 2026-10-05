@@ -2,6 +2,9 @@ defmodule DocumentOcrWeb.Auth do
   import Plug.Conn
   def init(opts), do: opts
 
+  def call(conn, _opts) when conn.request_path in ["/v1/companies", "/v1/service-accounts"],
+    do: conn
+
   def call(conn, _opts) do
     if Application.get_env(:document_ocr, :service_account_auth_required, false) and
          match?(["ApiKey " <> _], get_req_header(conn, "authorization")) do
