@@ -70,8 +70,9 @@ Authorization: ApiKey <account_id>:<secret>
 ```
 
 O segredo nunca é salvo em texto puro. A tabela armazena apenas um hash PBKDF2, e os
-escopos permitidos são `ocr:write`, `ocr:read`, `biometrics:write` e
-`biometrics:read`. Não existem escopos de update ou delete.
+escopos permitidos são `ocr:write`, `ocr:read`, `classifier:write`,
+`classifier:read`, `biometrics:write` e `biometrics:read`. Não existem escopos de
+update ou delete.
 
 Para habilitar a validação de `Authorization` durante o desenvolvimento local, inicie
 o servidor com `AIKE_AUTH_REQUIRED=true`. Sem essa variável, a autenticação permanece

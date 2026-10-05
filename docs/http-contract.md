@@ -17,12 +17,14 @@ Os routers usam escopos explícitos por pipeline:
 ```text
 ocr:write          POST /v1/documents e ações de processamento
 ocr:read           GET  /v1/documents/:id (inclui `result` quando disponível)
-biometrics:write  POST /v1/facematch
-biometrics:read   GET  /v1/facematch/:id
+classifier:write   POST /v1/classifications
+classifier:read    reservado para consultas futuras do classifier
+biometrics:write   POST /v1/facematch
+biometrics:read    GET  /v1/facematch/:id
 ```
 
-O endpoint síncrono do classifier usa `ocr:write`. Não existem escopos de update ou
-delete. `company_id` é sempre derivado da conta autenticada.
+O endpoint síncrono do classifier usa `classifier:write`. Não existem escopos de
+update ou delete. `company_id` é sempre derivado da conta autenticada.
 
 ## Provisionamento temporário
 
