@@ -12,8 +12,8 @@ defmodule Aike.CompanyProvisioningTest do
   end
 
   test "creates a company and a service account with a one-time secret" do
-    assert {:ok, %Company{id: "acme"} = company} =
-             Provisioning.create_company(Repo, %{id: "acme", name: "Acme"})
+    assert {:ok, %Company{} = company} =
+             Provisioning.create_company(Repo, %{name: "Acme"})
 
     assert {:ok, {account, secret}} =
              Provisioning.create_service_account(Repo, company, %{
@@ -31,7 +31,7 @@ defmodule Aike.CompanyProvisioningTest do
 
   test "rejects an account for an unknown company" do
     assert {:error, :company_not_found} =
-             Provisioning.create_service_account(Repo, "missing", %{
+             Provisioning.create_service_account(Repo, Ecto.UUID.generate(), %{
                name: "Unknown",
                scopes: ["ocr:read"]
              })
@@ -39,7 +39,7 @@ defmodule Aike.CompanyProvisioningTest do
 
   test "rejects scopes outside the service account dictionary" do
     assert {:ok, company} =
-             Provisioning.create_company(Repo, %{id: "acme", name: "Acme"})
+             Provisioning.create_company(Repo, %{name: "Acme"})
 
     assert {:error, changeset} =
              Provisioning.create_service_account(Repo, company, %{

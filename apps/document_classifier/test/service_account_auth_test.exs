@@ -10,7 +10,7 @@ defmodule DocumentClassifier.ServiceAccountAuthTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    Repo.insert!(%Company{id: "acme", name: "Acme"})
+    company = Repo.insert!(%Company{name: "Acme"})
     old = Application.get_env(:document_classifier, :service_account_auth_required, false)
     Application.put_env(:document_classifier, :service_account_auth_required, true)
 
@@ -18,15 +18,15 @@ defmodule DocumentClassifier.ServiceAccountAuthTest do
       Application.put_env(:document_classifier, :service_account_auth_required, old)
     end)
 
-    :ok
+    {:ok, company: company}
   end
 
-  test "classifier scopes distinguish write from read" do
+  test "classifier scopes distinguish write from read", %{company: company} do
     Repo.insert!(%ServiceAccount{
       account_id: "svc_classifier",
       secret_hash: Secret.hash("secret"),
       scopes: ["ocr:write"],
-      company_id: "acme",
+      company_id: company.id,
       name: "Classifier integration"
     })
 

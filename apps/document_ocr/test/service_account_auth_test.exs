@@ -10,7 +10,7 @@ defmodule DocumentOcr.ServiceAccountAuthTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    Repo.insert!(%Company{id: "acme", name: "Acme"})
+    company = Repo.insert!(%Company{name: "Acme"})
     old_required = Application.get_env(:document_ocr, :service_account_auth_required, false)
     Application.put_env(:document_ocr, :service_account_auth_required, true)
 
@@ -18,16 +18,16 @@ defmodule DocumentOcr.ServiceAccountAuthTest do
       Application.put_env(:document_ocr, :service_account_auth_required, old_required)
     end)
 
-    :ok
+    {:ok, company: company}
   end
 
-  test "valid ApiKey derives company and service account from the database" do
+  test "valid ApiKey derives company and service account from the database", %{company: company} do
     {:ok, account} =
       Repo.insert(%ServiceAccount{
         account_id: "svc_acme_prod_123",
         secret_hash: Secret.hash("sk_live_987654321"),
         scopes: ["ocr:write", "ocr:read"],
-        company_id: "acme",
+        company_id: company.id,
         name: "Acme Main Backend"
       })
 
@@ -52,12 +52,12 @@ defmodule DocumentOcr.ServiceAccountAuthTest do
     assert Documents.get_document!(id).app_id == account.company_id
   end
 
-  test "invalid secret is unauthorized and missing scope is forbidden" do
+  test "invalid secret is unauthorized and missing scope is forbidden", %{company: company} do
     Repo.insert!(%ServiceAccount{
       account_id: "svc_read_only",
       secret_hash: Secret.hash("secret"),
       scopes: ["ocr:read"],
-      company_id: "acme",
+      company_id: company.id,
       name: "Read only"
     })
 

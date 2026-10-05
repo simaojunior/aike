@@ -6,10 +6,10 @@ defmodule Mix.Tasks.Aike.Company.Create do
   alias KycCore.Auth.Provisioning
 
   @impl Mix.Task
-  def run([company_id, name]) do
+  def run([name]) do
     Mix.Task.run("app.start")
 
-    case Provisioning.create_company(DocumentOcr.Repo, %{id: company_id, name: name}) do
+    case Provisioning.create_company(DocumentOcr.Repo, %{name: name}) do
       {:ok, company} ->
         Mix.shell().info("Created company #{company.id} (#{company.name})")
 
@@ -19,6 +19,6 @@ defmodule Mix.Tasks.Aike.Company.Create do
   end
 
   def run(_args) do
-    Mix.raise("usage: mix aike.company.create COMPANY_ID NAME")
+    Mix.raise("usage: mix aike.company.create NAME")
   end
 end

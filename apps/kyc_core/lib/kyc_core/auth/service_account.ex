@@ -4,6 +4,7 @@ defmodule KycCore.Auth.ServiceAccount do
   alias KycCore.Auth.Scopes
 
   @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
   @type t :: %__MODULE__{}
   @type attrs :: map()
 
@@ -11,7 +12,7 @@ defmodule KycCore.Auth.ServiceAccount do
     field(:account_id, :string)
     field(:secret_hash, :string)
     field(:scopes, {:array, :string}, default: [])
-    field(:company_id, :string)
+    field(:company_id, :binary_id)
     field(:name, :string)
     field(:active, :boolean, default: true)
     timestamps(type: :utc_datetime_usec)

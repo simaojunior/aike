@@ -4,8 +4,8 @@ defmodule KycCore.Tenants.Company do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @type t :: %__MODULE__{id: String.t() | nil, name: String.t() | nil, active: boolean()}
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @type t :: %__MODULE__{id: Ecto.UUID.t(), name: String.t() | nil, active: boolean()}
 
   schema "companies" do
     field(:name, :string)
@@ -16,9 +16,8 @@ defmodule KycCore.Tenants.Company do
   @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(company, attrs) do
     company
-    |> cast(attrs, [:id, :name, :active])
-    |> validate_required([:id, :name])
-    |> validate_length(:id, min: 2, max: 128)
+    |> cast(attrs, [:name, :active])
+    |> validate_required([:name])
     |> validate_length(:name, min: 2, max: 160)
     |> unique_constraint(:id)
   end

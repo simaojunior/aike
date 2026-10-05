@@ -14,7 +14,7 @@ defmodule KycCore.Auth.Provisioning do
     |> repo.insert()
   end
 
-  @spec create_service_account(repo(), Company.t() | String.t(), map()) ::
+  @spec create_service_account(repo(), Company.t() | Ecto.UUID.t(), map()) ::
           {:ok, provisioned_account()} | {:error, :company_not_found | Ecto.Changeset.t()}
   def create_service_account(repo, company_or_id, attrs)
 
@@ -23,9 +23,15 @@ defmodule KycCore.Auth.Provisioning do
   end
 
   def create_service_account(repo, company_id, attrs) when is_binary(company_id) do
-    case repo.get(Company, company_id) do
-      nil -> {:error, :company_not_found}
-      company -> insert_service_account(repo, company, attrs)
+    case Ecto.UUID.cast(company_id) do
+      {:ok, uuid} ->
+        case repo.get(Company, uuid) do
+          nil -> {:error, :company_not_found}
+          company -> insert_service_account(repo, company, attrs)
+        end
+
+      :error ->
+        {:error, :company_not_found}
     end
   end
 
@@ -34,7 +40,7 @@ defmodule KycCore.Auth.Provisioning do
 
     account_id =
       Map.get(attrs, :account_id) || Map.get(attrs, "account_id") ||
-        generate_account_id(company.id)
+        generate_account_id()
 
     account_attrs =
       attrs
@@ -48,9 +54,7 @@ defmodule KycCore.Auth.Provisioning do
     end
   end
 
-  defp generate_account_id(company_id) do
-    "svc_#{company_id}_#{random_token(10)}"
-  end
+  defp generate_account_id, do: "svc_#{random_token(16)}"
 
   defp generate_secret do
     "sk_live_" <> random_token(32)
