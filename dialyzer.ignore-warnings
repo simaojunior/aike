@@ -1,0 +1,3 @@
+apps/biometrics/lib/biometrics/facematches.ex:7:call_without_opaque
+apps/biometrics/lib/biometrics/facematches.ex:16:call_without_opaque
+apps/document_ocr/lib/document_ocr/documents.ex:50:call_without_opaque
