@@ -33,7 +33,10 @@ defmodule DocumentOcr.Telemetry do
 
     :telemetry.execute(
       @event,
-      %{duration: duration, duration_ms: System.convert_time_unit(duration, :native, :millisecond)},
+      %{
+        duration: duration,
+        duration_ms: System.convert_time_unit(duration, :native, :millisecond)
+      },
       %{stage: stage, document_id: document.id, app_id: document.app_id, outcome: outcome(result)}
     )
   end

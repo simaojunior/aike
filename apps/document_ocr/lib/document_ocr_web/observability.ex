@@ -23,7 +23,13 @@ defmodule DocumentOcrWeb.Observability do
 
   defp log_completed(conn, request_id) do
     status = conn.status || 200
-    duration_ms = System.convert_time_unit(System.monotonic_time() - conn.assigns[:aike_started_at], :native, :millisecond)
+
+    duration_ms =
+      System.convert_time_unit(
+        System.monotonic_time() - conn.assigns[:aike_started_at],
+        :native,
+        :millisecond
+      )
 
     Logger.log(Obs.log_level(status), "HTTP request completed",
       event: "http.request.completed",
