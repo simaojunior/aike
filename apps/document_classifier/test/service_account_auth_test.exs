@@ -5,10 +5,12 @@ defmodule DocumentClassifier.ServiceAccountAuthTest do
 
   alias DocumentClassifier.Repo
   alias KycCore.Auth.{Secret, ServiceAccount}
+  alias KycCore.Tenants.Company
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    Repo.insert!(%Company{id: "acme", name: "Acme"})
     old = Application.get_env(:document_classifier, :service_account_auth_required, false)
     Application.put_env(:document_classifier, :service_account_auth_required, true)
 
