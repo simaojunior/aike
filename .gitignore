@@ -1,0 +1,7 @@
+/_build/
+/deps/
+/.direnv/
+/.nix-mix/
+/.nix-hex/
+/erl_crash.dump
+/.env
