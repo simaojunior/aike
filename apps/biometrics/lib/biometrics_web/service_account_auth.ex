@@ -5,7 +5,9 @@ defmodule BiometricsWeb.ServiceAccountAuth do
   def init(opts), do: opts
 
   def call(conn, opts) do
-    if Application.get_env(:biometrics, :service_account_auth_required, false), do: authenticate(conn, Keyword.get(opts, :scopes, [])), else: conn
+    if Application.get_env(:biometrics, :service_account_auth_required, false),
+      do: authenticate(conn, Keyword.get(opts, :scopes, ["facematch:write", "biometrics:write"])),
+      else: conn
   end
 
   defp authenticate(conn, scopes) do
@@ -26,6 +28,16 @@ defmodule BiometricsWeb.ServiceAccountAuth do
     end
   end
 
-  defp lookup(account_id), do: Application.fetch_env!(:biometrics, :service_account_repo).get_by(ServiceAccount, account_id: account_id)
-  defp deny(conn, status, error), do: conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(%{error: error})) |> halt()
+  defp lookup(account_id),
+    do:
+      Application.fetch_env!(:biometrics, :service_account_repo).get_by(ServiceAccount,
+        account_id: account_id
+      )
+
+  defp deny(conn, status, error),
+    do:
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(status, Jason.encode!(%{error: error}))
+      |> halt()
 end

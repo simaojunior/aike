@@ -2,11 +2,11 @@ defmodule BiometricsWeb.Router do
   use BiometricsWeb, :router
 
   pipeline :biometrics_write do
-    plug(BiometricsWeb.ServiceAccountAuth, scopes: ["biometrics:write"])
+    plug(BiometricsWeb.ServiceAccountAuth, scopes: ["facematch:write", "biometrics:write"])
   end
 
   pipeline :biometrics_read do
-    plug(BiometricsWeb.ServiceAccountAuth, scopes: ["biometrics:read"])
+    plug(BiometricsWeb.ServiceAccountAuth, scopes: ["facematch:read", "biometrics:read"])
   end
 
   scope "/v1" do

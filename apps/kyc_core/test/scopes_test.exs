@@ -10,6 +10,11 @@ defmodule KycCore.Auth.ScopesTest do
     assert Scopes.valid?("classifier:read")
   end
 
+  test "includes facematch read and write scopes" do
+    assert Scopes.valid?("facematch:write")
+    assert Scopes.valid?("facematch:read")
+  end
+
   test "does not treat OCR scope as classifier scope" do
     refute Scopes.valid?("classifier:delete")
     refute "classifier:write" in ["ocr:write"]

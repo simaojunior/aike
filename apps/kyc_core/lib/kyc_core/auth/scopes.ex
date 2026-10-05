@@ -6,6 +6,8 @@ defmodule KycCore.Auth.Scopes do
     "ocr:read",
     "classifier:write",
     "classifier:read",
+    "facematch:write",
+    "facematch:read",
     "biometrics:write",
     "biometrics:read"
   ]
