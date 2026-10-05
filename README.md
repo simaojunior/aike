@@ -55,13 +55,14 @@ depois:
 
 ```bash
 mix ecto.migrate -r DocumentOcr.Repo
-mix aike.company.create acme Acme
+mix aike.company.create Acme
 mix aike.service_account.create \
-  acme "Acme Development" \
+  <COMPANY_UUID> "Acme Development" \
   ocr:write,ocr:read,biometrics:write,biometrics:read
 ```
 
-O segundo comando imprime o `account_id` e o `secret`. Guarde o segredo e use-o nas
+O primeiro comando imprime o UUID da empresa; use-o em `<COMPANY_UUID>`. O segundo
+comando imprime o `account_id` e o `secret`. Guarde o segredo e use-o nas
 requisições autenticadas:
 
 ```text
