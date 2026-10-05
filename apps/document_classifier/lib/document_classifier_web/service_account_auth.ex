@@ -6,7 +6,7 @@ defmodule DocumentClassifierWeb.ServiceAccountAuth do
 
   def call(conn, opts) do
     if Application.get_env(:document_classifier, :service_account_auth_required, false),
-      do: authenticate(conn, Keyword.get(opts, :scopes, ["ocr:write"])),
+      do: authenticate(conn, Keyword.get(opts, :scopes, ["classifier:write"])),
       else: conn
   end
 

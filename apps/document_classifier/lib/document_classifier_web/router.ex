@@ -2,7 +2,7 @@ defmodule DocumentClassifierWeb.Router do
   use DocumentClassifierWeb, :router
 
   pipeline :classification do
-    plug(DocumentClassifierWeb.ServiceAccountAuth, scopes: ["ocr:write"])
+    plug(DocumentClassifierWeb.ServiceAccountAuth, scopes: ["classifier:write"])
   end
 
   scope "/v1" do

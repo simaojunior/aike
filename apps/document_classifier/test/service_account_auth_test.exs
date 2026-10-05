@@ -25,7 +25,7 @@ defmodule DocumentClassifier.ServiceAccountAuthTest do
     Repo.insert!(%ServiceAccount{
       account_id: "svc_classifier",
       secret_hash: Secret.hash("secret"),
-      scopes: ["ocr:write"],
+      scopes: ["classifier:write"],
       company_id: company.id,
       name: "Classifier integration"
     })
@@ -43,5 +43,8 @@ defmodule DocumentClassifier.ServiceAccountAuthTest do
 
     assert request.(:post, "ApiKey svc_classifier:secret").status == 200
     assert request.(:post, "ApiKey svc_classifier:wrong").status == 401
+
+    Repo.update_all(KycCore.Auth.ServiceAccount, set: [scopes: ["ocr:write"]])
+    assert request.(:post, "ApiKey svc_classifier:secret").status == 403
   end
 end
