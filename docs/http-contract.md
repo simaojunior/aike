@@ -19,8 +19,10 @@ ocr:write          POST /v1/documents e ações de processamento
 ocr:read           GET  /v1/documents/:id (inclui `result` quando disponível)
 classifier:write   POST /v1/classifications
 classifier:read    reservado para consultas futuras do classifier
-biometrics:write   POST /v1/facematch
-biometrics:read    GET  /v1/facematch/:id
+facematch:write    POST /v1/facematch
+facematch:read     GET  /v1/facematch/:id
+biometrics:write   alias de compatibilidade para `facematch:write`
+biometrics:read    alias de compatibilidade para `facematch:read`
 ```
 
 O endpoint síncrono do classifier usa `classifier:write`. Não existem escopos de
