@@ -27,7 +27,8 @@ defmodule Aike.MixProject do
       releases: [
         document_ocr: [applications: [document_ocr: :permanent]],
         document_classifier: [applications: [document_classifier: :permanent]],
-        biometrics: [applications: [biometrics: :permanent]]
+        biometrics: [applications: [biometrics: :permanent]],
+        backoffice: [applications: [backoffice: :permanent]]
       ]
     ]
   end
