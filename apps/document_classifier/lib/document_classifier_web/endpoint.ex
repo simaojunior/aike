@@ -1,10 +1,13 @@
 defmodule DocumentClassifierWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :document_classifier
   plug(Plug.RequestId)
+  plug(AikeHttp.Health)
+  plug(AikeHttp.ResponseHeaders)
+  plug(DocumentClassifierWeb.ShedLoad)
   plug(DocumentClassifierWeb.Auth)
   plug(DocumentClassifierWeb.ServiceAccountAuth)
 
-  plug(Plug.Parsers,
+  plug(AikeHttp.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     json_decoder: Jason,
     pass: [],

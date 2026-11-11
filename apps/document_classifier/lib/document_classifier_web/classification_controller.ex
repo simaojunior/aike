@@ -1,34 +1,28 @@
 defmodule DocumentClassifierWeb.ClassificationController do
+  @moduledoc """
+  `POST /v1/classifications`: classifies one image or PDF sent as multipart (`file` or
+  `image`) or as JSON base64 (`image`). The answer is synchronous.
+  """
   use DocumentClassifierWeb, :controller
+  action_fallback(DocumentClassifierWeb.FallbackController)
+
   alias DocumentClassifierWeb.ClassificationJSON
-  alias KycCore.JsonKeyFormatter
 
   plug(DocumentClassifierWeb.ValidateParams,
     create: &DocumentClassifierWeb.Schemas.ClassificationParams.create/1
   )
 
-  require Logger
-
   def create(conn, params) do
-    upload = params["file"] || params["image"]
-    input = if match?(%Plug.Upload{}, upload), do: upload, else: params
     started_at = System.monotonic_time(:millisecond)
+    {input, source} = resolve_input(params)
 
-    case DocumentClassifier.Classifications.classify(input) do
-      {:ok, result} ->
-        response =
-          if match?(%Plug.Upload{}, upload),
-            do: ClassificationJSON.upload(result, upload, started_at),
-            else: ClassificationJSON.legacy(result)
-
-        json(conn, JsonKeyFormatter.format(response))
-
-      {:error, :invalid_request} ->
-        conn |> put_status(422) |> json(%{error: "invalid_request"})
-
-      {:error, :service_unavailable} ->
-        Logger.warning("Classification service unavailable")
-        conn |> put_status(503) |> json(%{error: "service_unavailable"})
+    with {:ok, result} <-
+           DocumentClassifier.Classifications.classify(input, conn.assigns[:company_id]) do
+      json(conn, ClassificationJSON.render(result, source, started_at))
     end
   end
+
+  defp resolve_input(%{"file" => %Plug.Upload{} = upload}), do: {upload, upload}
+  defp resolve_input(%{"image" => %Plug.Upload{} = upload}), do: {upload, upload}
+  defp resolve_input(%{"image" => encoded} = params), do: {params, {:image, encoded}}
 end

@@ -3,7 +3,7 @@ defmodule DocumentClassifier.Application do
 
   @impl true
   def start(_type, _args) do
-    Supervisor.start_link([DocumentClassifier.Repo, DocumentClassifierWeb.Endpoint],
+    Supervisor.start_link([DocumentClassifierWeb.Endpoint],
       strategy: :one_for_one,
       name: DocumentClassifier.Supervisor
     )

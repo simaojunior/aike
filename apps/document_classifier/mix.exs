@@ -11,9 +11,11 @@ defmodule DocumentClassifier.MixProject do
       lockfile: "../../mix.lock",
       elixir: "~> 1.18",
       deps: [
+        {:aike_http, in_umbrella: true},
+        {:aike_observability, in_umbrella: true},
         {:kyc_core, in_umbrella: true},
-        {:ecto_sql, "~> 3.13"},
-        {:postgrex, "~> 0.21"},
+        {:aike_vision, in_umbrella: true},
+        {:aike_auth, in_umbrella: true},
         {:phoenix, "~> 1.8.0"},
         {:bandit, "~> 1.6"},
         {:jason, "~> 1.4"},

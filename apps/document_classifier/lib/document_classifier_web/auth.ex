@@ -33,10 +33,10 @@ defmodule DocumentClassifierWeb.Auth do
     end
   end
 
-  defp deny(conn) do
-    conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(401, ~s({"error":"unauthorized"}))
-    |> halt()
-  end
+  defp deny(conn),
+    do:
+      conn
+      |> put_resp_header("www-authenticate", "ApiKey")
+      |> AikeHttp.Problem.send(401, "unauthorized")
+      |> halt()
 end

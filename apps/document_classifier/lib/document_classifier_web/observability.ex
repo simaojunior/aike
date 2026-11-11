@@ -1,12 +1,14 @@
 defmodule DocumentClassifierWeb.Observability do
   import Plug.Conn
   require Logger
-  alias KycCore.Observability, as: Obs
+  alias AikeObservability, as: Obs
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    request_id = List.first(get_req_header(conn, "x-request-id")) || Ecto.UUID.generate()
+    request_id =
+      List.first(get_req_header(conn, "x-request-id")) ||
+        Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
 
     Logger.metadata(
       request_id: request_id,

@@ -1,13 +1,3 @@
-defmodule DocumentClassifier.TestStorageFailure do
-  @behaviour DocumentClassifier.Storage
-  def get(_), do: {:error, "SECRET-STORAGE-CREDENTIAL"}
-end
-
-defmodule DocumentClassifier.TestStorageRaise do
-  @behaviour DocumentClassifier.Storage
-  def get(_), do: raise("SECRET-STORAGE-CREDENTIAL")
-end
-
 defmodule DocumentClassifier.TestEngineFailure do
   @behaviour DocumentClassifier.Engine
   def classify(_, _), do: {:error, "SECRET-IMAGE-CONTENT"}
@@ -21,6 +11,11 @@ end
 defmodule DocumentClassifier.TestInvalidEngine do
   @behaviour DocumentClassifier.Engine
   def classify(_, _), do: {:ok, %{"confidence" => 2}}
+end
+
+defmodule DocumentClassifier.TestEngineOverloaded do
+  @behaviour DocumentClassifier.Engine
+  def classify(_, _), do: {:error, :overloaded}
 end
 
 defmodule DocumentClassifier.TestStorage do
@@ -61,7 +56,10 @@ defmodule DocumentClassifier.ClassificationAPITest do
     :ok
   end
 
-  defp payload(key), do: %{"source" => %{"type" => "object_storage", "key" => key}}
+  defp payload(key) do
+    fixture = key |> Path.basename(".jpg") |> String.replace("-", "_")
+    %{"image" => Base.encode64("fake:" <> fixture)}
+  end
 
   defp request(body, headers \\ []) do
     conn =
@@ -80,11 +78,36 @@ defmodule DocumentClassifier.ClassificationAPITest do
     assert get_resp_header(response, "content-type") == ["application/json; charset=utf-8"]
     assert [_] = get_resp_header(response, "x-request-id")
 
-    assert Jason.decode!(response.resp_body) == %{
-             "document" => %{"type" => "cnh", "country" => "BR", "side" => "front"},
-             "quality" => %{"acceptable" => true, "score" => 0.96, "issues" => []},
-             "confidence" => 0.99
-           }
+    body = Jason.decode!(response.resp_body)
+    assert body["version"] == "v1"
+    assert is_binary(body["id"])
+
+    assert body["data"] == [
+             %{
+               "classification" => %{
+                 "type" => "drivers_license",
+                 "country" => "BRA",
+                 "side" => "only_front",
+                 "confidence" => 0.99
+               },
+               "quality" => %{"isAccepted" => true, "issues" => []},
+               "fileInfo" => %{"fieldname" => "image"}
+             }
+           ]
+
+    bytes = "fake:frame_001"
+
+    assert [
+             %{
+               "fieldname" => "image",
+               "name" => nil,
+               "size" => byte_size(bytes),
+               "mimetype" => nil,
+               "sha256" => Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+             }
+           ] == body["metadata"]["filesInfo"]
+
+    assert is_integer(body["metadata"]["processingTimeMs"])
   end
 
   test "multipart image payload is classified without object storage" do
@@ -93,14 +116,28 @@ defmodule DocumentClassifier.ClassificationAPITest do
 
     try do
       response =
-        conn(:post, "/v1/classifications")
-        |> put_req_header("content-type", "multipart/form-data")
-        |> DocumentClassifierWeb.ClassificationController.create(%{
+        conn(:post, "/v1/classifications", %{
           "file" => %Plug.Upload{path: path, filename: "capture.jpg", content_type: "image/jpeg"}
         })
+        |> DocumentClassifierWeb.Endpoint.call([])
 
       assert response.status == 200
       body = Jason.decode!(response.resp_body)
+      ordered = Jason.decode!(response.resp_body, objects: :ordered_objects)
+      assert Enum.map(ordered.values, &elem(&1, 0)) == ~w(id version data metadata)
+      [entry] = ordered["data"]
+      assert Enum.map(entry.values, &elem(&1, 0)) == ~w(classification quality fileInfo)
+
+      assert Enum.map(entry["classification"].values, &elem(&1, 0)) ==
+               ~w(type country side confidence)
+
+      assert Enum.map(entry["quality"].values, &elem(&1, 0)) == ~w(isAccepted issues)
+
+      assert Enum.map(ordered["metadata"].values, &elem(&1, 0)) ==
+               ~w(filesInfo processingTimeMs)
+
+      [file] = ordered["metadata"]["filesInfo"]
+      assert Enum.map(file.values, &elem(&1, 0)) == ~w(fieldname name size mimetype sha256)
       assert body["version"] == "v1"
       assert Enum.at(body["data"], 0)["classification"]["type"] == "id_card"
       assert Enum.at(body["metadata"]["filesInfo"], 0)["fieldname"] == "file"
@@ -111,36 +148,29 @@ defmodule DocumentClassifier.ClassificationAPITest do
 
   test "HTTP fixtures support CNH back, RG front/back/single and unknown" do
     for {key, type, side} <- [
-          {"fake/cnh-back.jpg", "cnh", "back"},
-          {"fake/rg-front.jpg", "rg", "front"},
-          {"fake/rg-back.jpg", "rg", "back"},
-          {"fake/rg-single.jpg", "rg", "single"},
-          {"fake/unknown.jpg", "unknown", "unknown"}
+          {"fake/cnh-back.jpg", "drivers_license", "only_back"},
+          {"fake/rg-front.jpg", "id_card", "only_front"},
+          {"fake/rg-back.jpg", "id_card", "only_back"},
+          {"fake/rg-single.jpg", "id_card", "front_and_back"}
         ] do
       response = request(payload(key))
       assert response.status == 200
-
-      assert Jason.decode!(response.resp_body)["document"] ==
-               %{"type" => type, "country" => "BR", "side" => side}
+      [%{"classification" => classification}] = Jason.decode!(response.resp_body)["data"]
+      assert {classification["type"], classification["side"]} == {type, side}
+      assert classification["country"] == "BRA"
     end
   end
 
   test "unknown and bad quality remain successful classification responses" do
     unknown = request(payload("fake/unknown.jpg"))
     assert unknown.status == 200
-    assert Jason.decode!(unknown.resp_body)["confidence"] == 0.37
+    assert Jason.decode!(unknown.resp_body)["data"] == []
     bad = request(payload("fake/bad-quality.jpg"))
     assert bad.status == 200
-    data = Jason.decode!(bad.resp_body)
+    [entry] = Jason.decode!(bad.resp_body)["data"]
 
-    assert data["quality"] == %{
-             "acceptable" => false,
-             "score" => 0.42,
-             "issues" => ["blur", "glare"]
-           }
-
-    assert data["confidence"] == 0.98
-    refute Map.has_key?(data, "next_action")
+    assert entry["quality"] == %{"isAccepted" => false, "issues" => ["blur", "glare"]}
+    assert entry["classification"]["confidence"] == 0.98
   end
 
   test "missing and invalid source fields never reach storage" do
@@ -153,42 +183,49 @@ defmodule DocumentClassifier.ClassificationAPITest do
           %{"source" => %{"type" => "object_storage"}},
           %{"source" => %{"key" => "x"}},
           %{"source" => %{"type" => "url", "key" => "https://example.test/x"}},
-          payload(nil),
-          payload(123),
-          payload([]),
-          payload(""),
-          payload("   "),
-          payload(String.duplicate("a", 1025))
+          %{"source" => %{"type" => "object_storage", "key" => "fake/front.jpg"}},
+          %{"image" => nil},
+          %{"image" => 123},
+          %{"image" => []},
+          %{"image" => ""},
+          %{"image" => "not base64!"}
         ] do
       response = request(body)
       assert response.status == 422
-      assert Jason.decode!(response.resp_body) == %{"error" => "invalid_request"}
+      assert %{"code" => "validation", "errors" => [_ | _]} = Jason.decode!(response.resp_body)
     end
 
     refute_received {:storage_called, _}
   end
 
-  test "configured adapters receive key then bytes and can replace the fake engine" do
+  test "engine receives decoded image bytes without storage" do
     Application.put_env(:document_classifier, :storage, DocumentClassifier.TestStorage)
     Application.put_env(:document_classifier, :engine, DocumentClassifier.TestEngine)
     response = request(payload("private/object-key"))
     assert response.status == 200
-    assert_received {:storage_called, "private/object-key"}
-    assert_received {:engine_called, "synthetic-bytes", []}
-    assert Jason.decode!(response.resp_body)["document"]["type"] == "rg"
+    refute_received {:storage_called, _}
+    assert_received {:engine_called, "fake:object_key", []}
+
+    assert [%{"classification" => %{"type" => "id_card"}}] =
+             Jason.decode!(response.resp_body)["data"]
   end
 
-  test "storage failure stops before the engine" do
-    Application.put_env(:document_classifier, :storage, DocumentClassifier.TestStorageFailure)
-    Application.put_env(:document_classifier, :engine, DocumentClassifier.TestEngine)
-    capture_log(fn -> assert request(payload("private/key")).status == 503 end)
-    refute_received {:engine_called, _, _}
+  test "an overloaded node answers 503 with Retry-After and logs no error" do
+    Application.put_env(:document_classifier, :engine, DocumentClassifier.TestEngineOverloaded)
+
+    log =
+      capture_log(fn ->
+        response = request(payload("kyc/session-1/frame-1.jpg"))
+        assert response.status == 503
+        assert get_resp_header(response, "retry-after") == ["2"]
+        assert Jason.decode!(response.resp_body)["code"] == "service_unavailable"
+      end)
+
+    refute log =~ "classifier.failed"
   end
 
   test "adapter errors and exceptions return sanitized 503 without leaking data" do
     for {key, adapter} <- [
-          {:storage, DocumentClassifier.TestStorageFailure},
-          {:storage, DocumentClassifier.TestStorageRaise},
           {:engine, DocumentClassifier.TestEngineFailure},
           {:engine, DocumentClassifier.TestEngineRaise},
           {:engine, DocumentClassifier.TestInvalidEngine}
@@ -201,7 +238,11 @@ defmodule DocumentClassifier.ClassificationAPITest do
         capture_log(fn ->
           response = request(payload("private/key"))
           assert response.status == 503
-          assert Jason.decode!(response.resp_body) == %{"error" => "service_unavailable"}
+
+          assert %{
+                   "code" => "service_unavailable",
+                   "detail" => "The service is temporarily unavailable."
+                 } = Jason.decode!(response.resp_body)
         end)
 
       refute log =~ "SECRET"
@@ -226,8 +267,9 @@ defmodule DocumentClassifier.ClassificationAPITest do
     for key <- ["fake/unknown.jpg", "fake/bad-quality.jpg", "fake/cnh-back.jpg"] do
       assert request(payload(key)).status == 200
       response = request(payload("normal/front.jpg"))
-      assert Jason.decode!(response.resp_body)["document"]["side"] == "front"
-      assert Jason.decode!(response.resp_body)["quality"]["acceptable"]
+      [entry] = Jason.decode!(response.resp_body)["data"]
+      assert entry["classification"]["side"] == "only_front"
+      assert entry["quality"]["isAccepted"]
     end
   end
 

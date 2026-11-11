@@ -1,10 +1,22 @@
 defmodule DocumentClassifierWeb.ClassificationJSON do
-  @moduledoc "JSON representations for classification responses."
+  @moduledoc """
+  The classification response. Multipart and JSON (base64) requests get the same envelope,
+  see `DocumentClassifier.ClassificationResponse`.
+  """
 
-  @spec upload(map(), Plug.Upload.t(), integer()) :: map()
-  def upload(result, upload, started_at),
-    do: DocumentClassifier.ClassificationResponse.from_upload(result, upload, started_at)
+  @doc """
+  Renders a classification.
 
-  @spec legacy(map()) :: map()
-  def legacy(result), do: result
+  ## Parameters
+    - result: the engine result
+    - source: the uploaded file, or `{:image, base64}`
+    - started_at: monotonic start time in milliseconds
+
+  ## Returns
+    - the ordered response body
+  """
+  @spec render(map(), DocumentClassifier.ClassificationResponse.source(), integer()) ::
+          Jason.OrderedObject.t()
+  def render(result, source, started_at),
+    do: DocumentClassifier.ClassificationResponse.build(result, source, started_at)
 end

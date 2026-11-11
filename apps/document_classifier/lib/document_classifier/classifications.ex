@@ -1,49 +1,58 @@
 defmodule DocumentClassifier.Classifications do
+  @moduledoc "Synchronously classifies direct document bytes without persistence."
   alias DocumentClassifier.Result
 
-  def classify(%{"source" => %{"type" => "object_storage", "key" => key}})
-      when is_binary(key) and byte_size(key) > 0 and byte_size(key) <= 1024 do
-    if String.trim(key) == "", do: {:error, :invalid_request}, else: classify_key(key)
-  end
+  @file_errors [
+    :invalid_request,
+    :unsupported_image,
+    :image_too_large,
+    :unsupported_page_count,
+    :file_too_large
+  ]
+  require Logger
 
-  def classify(%Plug.Upload{} = upload), do: classify_upload(upload)
-  def classify(%{"image" => %Plug.Upload{} = upload}), do: classify_upload(upload)
+  @spec classify(map() | Plug.Upload.t(), String.t() | nil) :: {:ok, map()} | {:error, atom()}
+  def classify(input, company_id \\ nil)
 
-  def classify(_), do: {:error, :invalid_request}
-
-  defp classify_key(key) do
-    storage = Application.fetch_env!(:document_classifier, :storage)
-    engine = Application.fetch_env!(:document_classifier, :engine)
-
-    with {:ok, image} when is_binary(image) <- storage.get(key),
-         {:ok, result} <- engine.classify(image, []),
-         {:ok, result} <- Result.validate(result) do
-      {:ok, result}
-    else
-      _ -> {:error, :service_unavailable}
-    end
-  rescue
-    # Adapter messages may contain keys, credentials or image data.
-    _ -> {:error, :service_unavailable}
-  end
-
-  defp classify_upload(%Plug.Upload{path: path}) do
-    with {:ok, image} <- File.read(path),
-         {:ok, result} <- classify_binary(image) do
-      {:ok, result}
-    else
+  def classify(%{"image" => encoded}, company_id) when is_binary(encoded) do
+    case Base.decode64(encoded) do
+      {:ok, image} when byte_size(image) > 0 -> classify_binary(image, company_id)
       _ -> {:error, :invalid_request}
     end
   end
 
-  defp classify_binary(image) do
+  def classify(%Plug.Upload{} = upload, company_id), do: classify_upload(upload, company_id)
+
+  def classify(%{"image" => %Plug.Upload{} = upload}, company_id),
+    do: classify_upload(upload, company_id)
+
+  def classify(_, _company_id), do: {:error, :invalid_request}
+
+  defp classify_upload(%Plug.Upload{path: path}, company_id) do
+    case File.read(path) do
+      {:ok, image} when byte_size(image) > 0 -> classify_binary(image, company_id)
+      _ -> {:error, :invalid_request}
+    end
+  end
+
+  defp classify_binary(image, _company_id) do
     engine = Application.fetch_env!(:document_classifier, :engine)
 
-    with {:ok, result} <- engine.classify(image, []),
-         {:ok, result} <- Result.validate(result) do
+    with {:engine, {:ok, result}} <- {:engine, engine.classify(image, [])},
+         {:result, {:ok, result}} <- {:result, Result.validate(result)} do
       {:ok, result}
     else
-      _ -> {:error, :service_unavailable}
+      {:engine, {:error, reason}} when reason in @file_errors -> {:error, reason}
+      {:engine, {:error, :overloaded}} -> {:error, :overloaded}
+      {:engine, _} -> unavailable(:engine_failed)
+      {:result, _} -> unavailable(:invalid_engine_result)
     end
+  rescue
+    _ -> unavailable(:unexpected_exception)
+  end
+
+  defp unavailable(reason) do
+    Logger.error("Document classification failed: #{reason}", event: "classifier.failed")
+    {:error, :service_unavailable}
   end
 end
