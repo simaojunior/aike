@@ -10,8 +10,8 @@ defmodule AikeStorage.Reconciliation do
 
       {:ok, %{blobs_deleted: 0, objects_checked: 12}} = AikeStorage.Reconciliation.run(owner)
   """
-  alias AikeStorage.{Blobs, LocalInventory, Owner}
   alias AikeStorage.Adapter.{Local, S3}
+  alias AikeStorage.{Blobs, LocalInventory, Owner}
   alias AikeStorage.Transaction
 
   @doc """

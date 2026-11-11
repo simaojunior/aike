@@ -1,4 +1,10 @@
 defmodule AikeStorage.Key do
+  @moduledoc """
+  Builds the storage key of a blob.
+
+  The key holds the folder, the SHA-256 digest of the content and the file extension. The
+  same content always gets the same key.
+  """
   def for(binary, filename, opts \\ []) when is_binary(binary) do
     sha256 = :crypto.hash(:sha256, binary) |> Base.encode16(case: :lower)
     extension = extension(filename, Keyword.get(opts, :mime_type))

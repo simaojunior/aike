@@ -1,4 +1,9 @@
 defmodule AikeStorage.Adapter.Fake do
+  @moduledoc """
+  In-memory storage adapter for tests.
+
+  It keeps the objects in an ETS table. Do not use it outside the test environment.
+  """
   @behaviour AikeStorage.Adapter
 
   @table :aike_storage_fake_objects
