@@ -1,5 +1,5 @@
 defmodule DocumentClassifier.TestIdentity do
-  def authenticate(account, secret) when secret in ["secret", "sk_live_987654321"] do
+  def authenticate(account, secret) when secret in ["secret", "konoha-secret"] do
     scopes =
       if account == "svc_read_only",
         do: ["ocr:read"],
