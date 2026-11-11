@@ -5,3 +5,18 @@
 /.nix-hex/
 /erl_crash.dump
 /.env
+
+# Persistent local document uploads
+/var/uploads/
+/deploy/.env
+/var/models/
+
+# Documents and local tooling
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.tif
+*.tiff
+/docs/ocr-foundations.md
+/.claude/settings.local.json
