@@ -10,9 +10,9 @@ defmodule KycCore.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.18",
-      deps: [{:ecto, "~> 3.13"}, {:plug_crypto, "~> 2.2"}]
+      deps: []
     ]
   end
 
-  def application, do: [extra_applications: [:logger]]
+  def application, do: [extra_applications: [:crypto]]
 end
