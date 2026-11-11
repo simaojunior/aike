@@ -1,4 +1,10 @@
 defmodule DocumentClassifierWeb.Observability do
+  @moduledoc """
+  Request logging plug of the classifier service.
+
+  It sets the request ID and the log metadata, and it logs the end of each request without
+  personal data.
+  """
   import Plug.Conn
   require Logger
   alias AikeObservability, as: Obs

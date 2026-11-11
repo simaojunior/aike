@@ -1,11 +1,13 @@
 defmodule DocumentClassifier.CountingTestEngine do
   @behaviour DocumentClassifier.Engine
+  alias DocumentClassifier.Engine.Fake
+
   def classify(bytes, opts) do
     send(self(), {:classified, bytes})
 
     if bytes == "failure",
       do: {:error, :unavailable},
-      else: DocumentClassifier.Engine.Fake.classify(bytes, opts)
+      else: Fake.classify(bytes, opts)
   end
 end
 

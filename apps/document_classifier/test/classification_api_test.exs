@@ -28,9 +28,11 @@ end
 
 defmodule DocumentClassifier.TestEngine do
   @behaviour DocumentClassifier.Engine
+  alias DocumentClassifier.Engine.Fake
+
   def classify(bytes, opts) do
     send(self(), {:engine_called, bytes, opts})
-    DocumentClassifier.Engine.Fake.classify("fake:rg_single", [])
+    Fake.classify("fake:rg_single", [])
   end
 end
 

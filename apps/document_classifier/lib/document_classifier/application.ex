@@ -1,4 +1,9 @@
 defmodule DocumentClassifier.Application do
+  @moduledoc """
+  OTP application of the classifier service.
+
+  It starts the HTTP endpoint. The service keeps no state.
+  """
   use Application
 
   @impl true

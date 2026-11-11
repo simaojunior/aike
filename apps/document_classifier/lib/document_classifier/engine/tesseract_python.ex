@@ -15,24 +15,8 @@ defmodule DocumentClassifier.Engine.TesseractPython do
         "aike-classifier-" <> Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false)
       )
 
-    with :ok <- File.mkdir(directory) do
-      try do
-        with :ok <- File.chmod(directory, 0o700),
-             :ok <- File.write(Path.join(directory, "input"), bytes),
-             {:ok, output} <- extract(directory),
-             {:ok, %{"text" => text, "confidence" => confidence} = extracted} <-
-               Jason.decode(output),
-             issues when is_list(issues) <- Map.get(extracted, "issues", []),
-             true <- Enum.all?(issues, &is_binary/1) do
-          {:ok, TextRules.classify(text, confidence, issues)}
-        else
-          {:error, :invalid_request} -> {:error, :invalid_request}
-          _ -> unavailable(:extraction_failed)
-        end
-      after
-        File.rm_rf(directory)
-      end
-    else
+    case File.mkdir(directory) do
+      :ok -> classify_in(directory, bytes)
       {:error, _} -> unavailable(:temporary_directory_failed)
     end
   rescue
@@ -40,6 +24,23 @@ defmodule DocumentClassifier.Engine.TesseractPython do
   end
 
   def classify(_, _), do: {:error, :invalid_request}
+
+  defp classify_in(directory, bytes) do
+    with :ok <- File.chmod(directory, 0o700),
+         :ok <- File.write(Path.join(directory, "input"), bytes),
+         {:ok, output} <- extract(directory),
+         {:ok, %{"text" => text, "confidence" => confidence} = extracted} <-
+           Jason.decode(output),
+         issues when is_list(issues) <- Map.get(extracted, "issues", []),
+         true <- Enum.all?(issues, &is_binary/1) do
+      {:ok, TextRules.classify(text, confidence, issues)}
+    else
+      {:error, :invalid_request} -> {:error, :invalid_request}
+      _ -> unavailable(:extraction_failed)
+    end
+  after
+    File.rm_rf(directory)
+  end
 
   defp extract(directory) do
     script = Application.app_dir(:document_classifier, "priv/classify_text.py")

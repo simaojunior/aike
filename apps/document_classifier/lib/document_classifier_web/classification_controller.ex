@@ -7,9 +7,10 @@ defmodule DocumentClassifierWeb.ClassificationController do
   action_fallback(DocumentClassifierWeb.FallbackController)
 
   alias DocumentClassifierWeb.ClassificationJSON
+  alias DocumentClassifierWeb.Schemas.ClassificationParams
 
   plug(DocumentClassifierWeb.ValidateParams,
-    create: &DocumentClassifierWeb.Schemas.ClassificationParams.create/1
+    create: &ClassificationParams.create/1
   )
 
   def create(conn, params) do
