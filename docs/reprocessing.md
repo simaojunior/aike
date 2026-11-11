@@ -1,10 +1,10 @@
 # Reprocessamento com identidade de execução — checkpoint 5
 
 ```http
-POST /v1/documents/:id/reprocess
-Content-Type: application/json
+POST /v1/extractions/:id/reprocess
+content-type: application/json
 
-{"pipeline_version":"2026.11.0"}
+{"pipelineVersion":"2026.11.0"}
 ```
 
 Resposta 202:
@@ -15,12 +15,12 @@ Resposta 202:
 
 POST de criação, GET de documento e GET de resultado também retornam `run_id`.
 O consumidor pode comparar esse identificador durante o polling e detectar que
-outro pedido iniciou uma execução mais recente. Imagens, app_id, external_id e
+outro pedido iniciou uma execução mais recente. Imagens, `appId`, `externalId` e
 document ID são preservados; request_id é atualizado para correlacionar a nova execução.
 
 ## Versões e respostas
 
-- Esta versão aceita somente o `pipeline_version` ativo em configuração. A nova
+- Esta versão aceita somente o `pipelineVersion` ativo em configuração. A nova
   execução captura engine e versões ativas pelos mesmos registros do checkpoint 4.
   Não se executa o código atual sob uma versão desconhecida ou histórica.
 - Corpo incompleto, valor inválido ou versão não suportada: 422.

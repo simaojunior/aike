@@ -1,8 +1,45 @@
 # OCR substituível e proveniência — checkpoint 4
 
 `DocumentOcr.OCR.Engine` mantém o contrato `extract(binary(), keyword())` retornando
-`{:ok, map()}` ou `{:error, term()}`. Só existem adapters fake e fixtures de teste.
-Nenhum modelo, processo Python ou serviço de inferência foi adicionado.
+`{:ok, map()}` ou `{:error, term()}`. Adapters registrados:
+
+| Módulo | Versão | Uso |
+|---|---|---|
+| `DocumentOcr.OCR.Fake` | `fake-1` | testes (`config/test.exs`); resposta fixa |
+| `DocumentOcr.OCR.Tesseract` | `tesseract-5-por-5` | padrão; Elixir + OpenCV (`aike_vision`); linhas com geometria |
+| `DocumentOcr.OCR.TesseractPython` | `tesseract-5-por-1` | referência em Python (`priv/ocr_lines.py`) |
+
+Novos documentos usam `DocumentOcr.OCR.Tesseract`, `tesseract-5-por-5` e o extrator
+`br-labels-3`. Documentos criados antes continuam com a configuração gravada neles, e a
+reutilização de resultado só aceita a mesma engine e versão.
+
+O motor Tesseract (`tesseract-5-por-5`):
+
+- Foto: encontra a orientação (0° primeiro; as outras rotações só sem texto suficiente),
+  recorta o documento e, num cartão aberto (proporção acima de 2,2:1, como o RG com frente e
+  verso lado a lado), lê cada metade separadamente.
+- PDF: imagens embutidas na resolução nativa; sem elas, a página renderizada.
+- Cada linha traz as caixas das palavras (`words`), para separar rótulos impressos lado a lado.
+- Passadas: cinza, canal azul e cinza esticado, todas com `--psm 4`. O cinza esticado
+  leva o papel ao branco e a tinta clara ao preto. Assim o OCR lê os valores em vermelho
+  da CNH (categoria, nº de registro, validade). O RG tem mais uma passada esparsa
+  (`--psm 11`) no canal azul, para campos isolados como a data de nascimento.
+
+O extrator `br-labels-3` lê cada campo pelo rótulo impresso e escolhe, entre as passadas,
+o valor válido, mais repetido e com maior confiança. O pipeline junta as linhas de todas
+as imagens do documento (frente primeiro), porque o RG imprime os dados no verso.
+
+| Tipo | Módulo | Campos |
+|---|---|---|
+| `cnh` | `DocumentOcr.Extraction.CNHLabels` | obrigatórios `full_name`, `cpf`, `birth_date`; opcionais: documento de identidade, filiação, categoria, registro, validade, 1ª habilitação, local e data de emissão |
+| `rg` | `DocumentOcr.Extraction.RGLabels` | obrigatórios `full_name`, `rg_number`, `birth_date`; opcionais: expedição, filiação, naturalidade, documento de origem, `cpf` |
+
+No RG, o rótulo da data de nascimento é pequeno e claro. Sem ele, a data mais antiga de
+duas ou mais é a de nascimento, porque a data de expedição é sempre posterior. Com uma
+data só, o campo fica vazio e o documento vai para revisão.
+
+Um tipo sem extrator registrado na versão ativa é recusado na criação (`422`), em vez de
+falhar depois no worker. Capacidade e concorrência: `docs/capacity.md`.
 
 ## Seleção e registro
 
@@ -10,12 +47,20 @@ Configuração atual em `config/config.exs`:
 
 ```elixir
 config :document_ocr,
-  ocr_engine: DocumentOcr.OCR.Fake,
-  ocr_engine_version: "fake-1",
-  extractor_version: "fake-cnh-1",
+  ocr_engine: DocumentOcr.OCR.Tesseract,
+  ocr_engine_version: "tesseract-5-por-5",
+  extractor_version: "br-labels-3",
   pipeline_version: "2026.11.0",
-  ocr_engines: [{DocumentOcr.OCR.Fake, "fake-1"}],
-  extractors: %{{"cnh", "fake-cnh-1"} => DocumentOcr.Extraction.CNH}
+  ocr_engines: [
+    {DocumentOcr.OCR.Fake, "fake-1"},
+    {DocumentOcr.OCR.Tesseract, "tesseract-5-por-5"},
+    {DocumentOcr.OCR.TesseractPython, "tesseract-5-por-1"}
+  ],
+  extractors: %{
+    {"cnh", "fake-cnh-1"} => DocumentOcr.Extraction.CNH,
+    {"cnh", "br-labels-3"} => DocumentOcr.Extraction.CNHLabels,
+    {"rg", "br-labels-3"} => DocumentOcr.Extraction.RGLabels
+  }
 ```
 
 As quatro primeiras chaves selecionam a configuração de **novos documentos**.

@@ -1,5 +1,10 @@
 # Revisão de arquitetura — checkpoint 3
 
+> Registro histórico, não descrição da implementação atual. Consulte o
+> [diagnóstico e arquitetura-alvo](architecture-target.md) antes de alterar fronteiras
+> ou preparar releases. As afirmações abaixo sobre core puro e classifier sem banco
+> deixaram de corresponder ao código após os checkpoints seguintes.
+
 Escopo: seção 47 do guia, após os dois fluxos fake. Inspeção realizada antes das
 correções deste checkpoint. Nenhuma infraestrutura ou modelo de ML será introduzido.
 

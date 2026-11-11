@@ -18,3 +18,7 @@ O modo `:sync` existe apenas para testes que precisam preservar o processo chama
 Jobs de uma execução antiga são cancelados por `run_id` antes de cada estágio e também
 antes de persistir o resultado. Portanto, um timeout ou resultado tardio não pode
 sobrescrever uma reprocessamento mais novo.
+
+Se uma queda impedir a atualização final do documento e o Oban descartar o job,
+a [reconciliação periódica](reconciliation.md) corrige o estado depois, desde que
+não haja trabalho ativo na execução atual.
