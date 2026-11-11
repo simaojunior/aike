@@ -1,13 +1,20 @@
 defmodule BiometricsWeb.Observability do
   import Plug.Conn
   require Logger
-  alias KycCore.Observability, as: Obs
+  alias AikeObservability, as: Obs
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
     request_id = List.first(get_req_header(conn, "x-request-id")) || Ecto.UUID.generate()
-    Logger.metadata(request_id: request_id, service: "biometrics", app_id: conn.assigns[:company_id], service_account_id: conn.assigns[:service_account_id])
+
+    Logger.metadata(
+      request_id: request_id,
+      service: "biometrics",
+      app_id: conn.assigns[:company_id],
+      service_account_id: conn.assigns[:service_account_id]
+    )
+
     conn
     |> assign(:aike_started_at, System.monotonic_time())
     |> put_resp_header("x-request-id", request_id)
@@ -16,11 +23,22 @@ defmodule BiometricsWeb.Observability do
 
   defp log_completed(conn, request_id) do
     status = conn.status || 200
-    duration_ms = System.convert_time_unit(System.monotonic_time() - conn.assigns[:aike_started_at], :native, :millisecond)
+
+    duration_ms =
+      System.convert_time_unit(
+        System.monotonic_time() - conn.assigns[:aike_started_at],
+        :native,
+        :millisecond
+      )
 
     Logger.log(Obs.log_level(status), "HTTP request completed",
-      event: "http.request.completed", request_id: request_id, service: "biometrics",
-      status: status, status_class: Obs.status_class(status), duration_ms: duration_ms, method: conn.method
+      event: "http.request.completed",
+      request_id: request_id,
+      service: "biometrics",
+      status: status,
+      status_class: Obs.status_class(status),
+      duration_ms: duration_ms,
+      method: conn.method
     )
 
     conn
