@@ -25,7 +25,8 @@
       default = mkShell {
         name = "aike";
         packages = with pkgs;
-          [(elixir-with-otp erlang_28).latest postgresql_18 docker-compose curl jq]
+          [(elixir-with-otp erlang_28).latest postgresql_18 docker-compose curl jq
+            tesseract poppler-utils coreutils (python3.withPackages (ps: [ps.pillow ps.numpy ps.opencv4]))]
           ++ lib.optionals stdenv.isLinux [inotify-tools]
           ++ lib.optionals stdenv.isDarwin [
             darwin.apple_sdk.frameworks.CoreServices
