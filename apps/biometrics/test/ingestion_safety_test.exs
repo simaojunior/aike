@@ -2,14 +2,16 @@ defmodule Biometrics.IngestionSafetyTest do
   use ExUnit.Case, async: false
   use Oban.Testing, repo: Biometrics.Repo
   import Ecto.Query
+  alias AikeStorage.Adapter.Fake
+  alias AikeStorage.{Blob, Blobs}
   alias Biometrics.{Facematches, Repo}
   alias Biometrics.Facematches.FacematchSession
-  alias AikeStorage.{Blob, Blobs}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    AikeStorage.Adapter.Fake.reset()
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
+    Fake.reset()
     :ok
   end
 

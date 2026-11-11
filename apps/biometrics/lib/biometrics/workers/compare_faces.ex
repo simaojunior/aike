@@ -1,4 +1,10 @@
 defmodule Biometrics.Workers.CompareFaces do
+  @moduledoc """
+  Oban worker that compares the faces of one facematch session.
+
+  It runs the configured engine. It refuses a session that another engine version created,
+  and it ends the session when the retries end.
+  """
   use Oban.Worker, queue: :biometrics, max_attempts: 3
 
   @impl true

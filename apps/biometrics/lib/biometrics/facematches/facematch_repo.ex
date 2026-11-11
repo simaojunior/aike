@@ -8,6 +8,7 @@ defmodule Biometrics.Facematches.FacematchRepo do
   use Biometrics, :repository
 
   alias Biometrics.Facematches.{FacematchResult, FacematchSession}
+  alias Biometrics.Workers.CompareFaces
 
   @spec get(Ecto.UUID.t()) :: FacematchSession.t() | nil
   def get(id), do: Repo.get(FacematchSession, id) |> preload()
@@ -83,7 +84,7 @@ defmodule Biometrics.Facematches.FacematchRepo do
     Ecto.Multi.new()
     |> Ecto.Multi.insert(:session, Ecto.Changeset.change(changeset, profile))
     |> Ecto.Multi.run(:job, fn _repo, %{session: session} ->
-      Oban.insert(Biometrics.Oban, Biometrics.Workers.CompareFaces.new(%{id: session.id}))
+      Oban.insert(Biometrics.Oban, CompareFaces.new(%{id: session.id}))
     end)
     |> Repo.transaction()
   end

@@ -3,8 +3,10 @@ defmodule Biometrics.QueueMetricsTest do
   import Plug.Conn
   import Plug.Test
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   test "biometrics exposes only its own queues with its operational token" do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Biometrics.Repo)
+    :ok = Sandbox.checkout(Biometrics.Repo)
     original = Application.fetch_env(:biometrics, :metrics_token)
     Application.put_env(:biometrics, :metrics_token, "biometrics-scrape")
 

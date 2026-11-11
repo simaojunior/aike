@@ -45,10 +45,12 @@ defmodule Biometrics.Facematches do
   end
 
   defp read_upload(%Plug.Upload{} = upload) do
-    with {:ok, bytes} when byte_size(bytes) > 0 <- File.read(upload.path) do
-      {:ok, %{binary: bytes, filename: upload.filename, mime_type: upload.content_type}}
-    else
-      _ -> {:error, :invalid_upload}
+    case File.read(upload.path) do
+      {:ok, bytes} when byte_size(bytes) > 0 ->
+        {:ok, %{binary: bytes, filename: upload.filename, mime_type: upload.content_type}}
+
+      _ ->
+        {:error, :invalid_upload}
     end
   end
 

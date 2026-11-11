@@ -1,7 +1,7 @@
 defmodule Biometrics.Requests do
   @moduledoc "Persists replay bindings in the same transaction as the resource and its job."
-  alias Biometrics.Requests.Request
   alias AikeStorage.Transaction
+  alias Biometrics.Requests.Request
 
   @spec run(module(), atom(), String.t(), term(), String.t(), (-> term()), (String.t() -> term())) ::
           term()

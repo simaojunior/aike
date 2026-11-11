@@ -19,10 +19,11 @@ defmodule Biometrics.ResultReuseTest do
   use ExUnit.Case, async: false
   use Oban.Testing, repo: Biometrics.Repo
   alias Biometrics.{Facematches, Repo, Workers.CompareFaces}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     engine = Application.fetch_env!(:biometrics, :engine)
     version = Application.fetch_env!(:biometrics, :engine_version)
     Application.put_env(:biometrics, :engine, Biometrics.ReuseTestEngine)

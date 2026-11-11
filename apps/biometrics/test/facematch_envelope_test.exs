@@ -55,9 +55,11 @@ defmodule Biometrics.FacematchEnvelopeTest do
   import Plug.Test
   import Plug.Conn
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Biometrics.Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Biometrics.Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Biometrics.Repo)
+    Sandbox.mode(Biometrics.Repo, {:shared, self()})
     keys = [:engine, :decision]
     original = Map.new(keys, &{&1, Application.get_env(:biometrics, &1)})
     Application.put_env(:biometrics, :engine, Biometrics.FaceTestEngine)

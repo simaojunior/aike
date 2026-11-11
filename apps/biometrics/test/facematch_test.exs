@@ -3,9 +3,11 @@ defmodule Biometrics.FacematchTest do
   use Oban.Testing, repo: Biometrics.Repo
   import Plug.Test
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Biometrics.Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Biometrics.Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Biometrics.Repo)
+    Sandbox.mode(Biometrics.Repo, {:shared, self()})
     :ok
   end
 

@@ -1,4 +1,9 @@
 defmodule Biometrics.Application do
+  @moduledoc """
+  OTP application of the biometrics service.
+
+  It starts the repository, the HTTP endpoint, Oban and the completion registry.
+  """
   use Application
 
   def start(_type, _args) do
