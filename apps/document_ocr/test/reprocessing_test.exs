@@ -225,8 +225,6 @@ defmodule DocumentOcr.ReprocessingTest do
     document = create()
     drain()
     before_restart = Documents.get_document!(document.id)
-    # An outer transaction models failure after the whole context operation.
-    # Its rollback must restore the previous run, outputs and enqueue atomically.
     assert {:error, :abort} =
              Repo.transaction(fn ->
                assert {:ok, _} = Documents.reprocess_document(document.id, "2026.11.0")
@@ -255,7 +253,6 @@ defmodule DocumentOcr.ReprocessingTest do
     document = create()
     drain()
     original = Documents.get_document!(document.id)
-    # This transaction-local constraint targets only this generated fixture ID.
     Repo.query!(
       "ALTER TABLE oban_jobs ADD CONSTRAINT kyc_test_enqueue_failure CHECK (args->>'document_id' <> '#{document.id}') NOT VALID"
     )

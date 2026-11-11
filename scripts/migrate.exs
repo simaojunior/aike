@@ -1,4 +1,3 @@
-# Run with the owner's release eval. Never run migrations from a consumer release.
 {app, repo} =
   case System.fetch_env!("RELEASE_NAME") do
     "document_ocr" -> {:document_ocr, DocumentOcr.Repo}

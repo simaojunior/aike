@@ -1,4 +1,3 @@
-# mix run --no-start scripts/check_boundaries.exs (no database required).
 defmodule Aike.CheckBoundaries do
   def dependencies(app, seen \\ MapSet.new()) do
     if MapSet.member?(seen, app) do

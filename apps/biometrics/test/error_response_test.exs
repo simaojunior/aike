@@ -4,7 +4,6 @@ defmodule Biometrics.ErrorResponseTest do
   import Plug.Test
 
   setup_all do
-    # Also runs with --no-start, without starting a Repo or Oban.
     {:ok, _} = Application.ensure_all_started(:phoenix)
     {:ok, _} = Application.ensure_all_started(:bandit)
 

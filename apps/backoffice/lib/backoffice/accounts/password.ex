@@ -1,6 +1,5 @@
 defmodule Backoffice.Accounts.Password do
   @moduledoc "Argon2id password hashing with bounded input and a dummy missing-user check."
-  # 32 MiB, two passes, one lane; parameters are encoded into each stored hash.
   @options [argon2_type: 2, m_cost: 15, t_cost: 2, parallelism: 1]
   @spec valid?(term()) :: boolean()
   def valid?(password), do: validation_error(password) == nil

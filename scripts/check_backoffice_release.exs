@@ -1,4 +1,3 @@
-# Run using the backoffice release's eval. Synthetic writes are rolled back.
 {:ok, _} = Application.ensure_all_started(:backoffice)
 
 for app <- [:document_ocr, :document_classifier, :biometrics, :oban] do

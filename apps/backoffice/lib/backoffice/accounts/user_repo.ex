@@ -71,7 +71,6 @@ defmodule Backoffice.Accounts.UserRepo do
 
   defp ensure_platform_company(company, _attrs), do: {:ok, company}
 
-  # This context accepts company_name, not the administrator's name.
   defp company_validation_result({:error, %Ecto.Changeset{} = changeset}) do
     errors =
       Enum.map(changeset.errors, fn
