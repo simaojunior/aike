@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 base="${OCR_URL:-http://localhost:4000}"
-created=$(curl --fail --silent --show-error "$base/v1/documents" \
+: "${AIKE_ACCOUNT_ID:?Set AIKE_ACCOUNT_ID}"
+: "${AIKE_ACCOUNT_SECRET:?Set AIKE_ACCOUNT_SECRET}"
+auth=(-H "authorization: ApiKey ${AIKE_ACCOUNT_ID}:${AIKE_ACCOUNT_SECRET}")
+created=$(curl --fail --silent --show-error "${auth[@]}" "$base/v1/extractions" \
   -H 'content-type: application/json' \
-  -d '{"app_id":"smoke","external_id":"local-smoke","document":{"type":"cnh","country":"BR"},"images":[{"side":"front","source":{"type":"object_storage","key":"fake/front.jpg"}}]}')
+  -d '{"appId":"smoke","externalId":"local-smoke","document":{"type":"cnh","country":"BR"},"images":[{"side":"front","image":"ZmFrZTpmcm9udA=="}]}')
 document_id=$(jq -er '.id' <<< "$created")
 for attempt in {1..30}; do
-  status=$(curl --fail --silent --show-error "$base/v1/documents/$document_id" | jq -er '.status')
+  status=$(curl --fail --silent --show-error "${auth[@]}" "$base/v1/extractions/$document_id" | jq -er '.status')
   if [[ "$status" == completed ]]; then
-    curl --fail --silent --show-error "$base/v1/documents/$document_id" | \
-      jq -e '.status == "completed" and .result.person.cpf.value == "52998224725" and .result.person.birth_date.value == "1990-03-12"' >/dev/null
+    curl --fail --silent --show-error "${auth[@]}" "$base/v1/extractions/$document_id" | \
+      jq -e '.status == "completed" and .result.person.cpf.value == "52998224725" and .result.person.birthDate.value == "1990-03-12"' >/dev/null
     echo "HTTP + Oban + persisted result: completed ($document_id)"
     exit 0
   fi

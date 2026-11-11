@@ -1,25 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 base="${CLASSIFIER_URL:-http://localhost:4001}"
+: "${AIKE_ACCOUNT_ID:?Set AIKE_ACCOUNT_ID}"
+: "${AIKE_ACCOUNT_SECRET:?Set AIKE_ACCOUNT_SECRET}"
+: "${CLASSIFIER_FILE:?Set CLASSIFIER_FILE to a JPEG, PNG or single-page PDF}"
+test -f "$CLASSIFIER_FILE"
 
-check() {
-  local key="$1" type="$2" side="$3" acceptable="$4" score="$5" confidence="$6" issues="$7"
-  jq -nc --arg key "$key" '{source:{type:"object_storage",key:$key}}' |
-    curl --fail --silent --show-error "$base/v1/classifications" \
-      -H 'content-type: application/json' --data-binary @- |
-    jq -e --arg type "$type" --arg side "$side" \
-      --argjson acceptable "$acceptable" --argjson score "$score" \
-      --argjson confidence "$confidence" --argjson issues "$issues" \
-      '.document == {type:$type,country:"BR",side:$side} and
-       .quality == {acceptable:$acceptable,score:$score,issues:$issues} and
-       .confidence == $confidence' >/dev/null
-  echo "Classifier HTTP: $key OK"
-}
+base64 -w0 "$CLASSIFIER_FILE" | jq -Rs '{image: .}' |
+  curl --fail-with-body --silent --show-error "$base/v1/classifications" \
+    -H 'content-type: application/json' \
+    -H "authorization: ApiKey ${AIKE_ACCOUNT_ID}:${AIKE_ACCOUNT_SECRET}" --data-binary @- |
+  jq -e '.document.type as $type | ($type == "cnh" or $type == "rg" or $type == "unknown") and (.confidence >= 0 and .confidence <= 1)'
 
-check 'kyc/session-123/frame-001.jpg' cnh front true 0.96 0.99 '[]'
-check 'fake/cnh-back.jpg' cnh back true 0.96 0.99 '[]'
-check 'fake/rg-front.jpg' rg front true 0.96 0.99 '[]'
-check 'fake/rg-back.jpg' rg back true 0.96 0.99 '[]'
-check 'fake/rg-single.jpg' rg single true 0.96 0.99 '[]'
-check 'fake/unknown.jpg' unknown unknown true 0.91 0.37 '[]'
-check 'fake/bad-quality.jpg' cnh front false 0.42 0.98 '["blur","glare"]'
+curl --fail-with-body --silent --show-error "$base/v1/classifications" \
+  -H "authorization: ApiKey ${AIKE_ACCOUNT_ID}:${AIKE_ACCOUNT_SECRET}" \
+  -F "file=@${CLASSIFIER_FILE}" |
+  jq -e '.version == "v1" and (.data | type == "array") and (.metadata.filesInfo | length == 1)'
