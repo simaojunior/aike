@@ -96,28 +96,26 @@ defmodule AikeHttp.Problem do
   def validation(conn, errors),
     do: send(conn, 422, "validation", AikeHttp.FieldIssues.from_peri(errors))
 
+  @template_codes %{
+    400 => "bad_request",
+    401 => "unauthorized",
+    403 => "forbidden",
+    404 => "not_found",
+    405 => "method_not_allowed",
+    406 => "not_acceptable",
+    413 => "payload_too_large",
+    415 => "unsupported_media_type",
+    422 => "validation",
+    429 => "rate_limited",
+    503 => "service_unavailable"
+  }
+
   @doc "Builds the error body for a Phoenix error template such as `\"404.json\"`."
   @spec from_template(String.t()) :: Jason.OrderedObject.t()
   def from_template(template) do
     status = template |> String.split(".") |> hd() |> String.to_integer()
 
-    code =
-      case status do
-        400 -> "bad_request"
-        401 -> "unauthorized"
-        403 -> "forbidden"
-        404 -> "not_found"
-        405 -> "method_not_allowed"
-        406 -> "not_acceptable"
-        413 -> "payload_too_large"
-        415 -> "unsupported_media_type"
-        422 -> "validation"
-        429 -> "rate_limited"
-        503 -> "service_unavailable"
-        _ -> "internal_server_error"
-      end
-
-    body(code)
+    body(Map.get(@template_codes, status, "internal_server_error"))
   end
 
   defp id_field(nil), do: []

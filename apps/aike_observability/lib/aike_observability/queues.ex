@@ -11,10 +11,8 @@ defmodule AikeObservability.Queues do
     GROUP BY queue, state
     """
 
-    with {:ok, %{rows: rows}} <-
-           repo.query(sql, [queues, @states], timeout: 5_000, log: false) do
-      {:ok, encode(service, queues, rows)}
-    else
+    case repo.query(sql, [queues, @states], timeout: 5_000, log: false) do
+      {:ok, %{rows: rows}} -> {:ok, encode(service, queues, rows)}
       _ -> {:error, :unavailable}
     end
   rescue

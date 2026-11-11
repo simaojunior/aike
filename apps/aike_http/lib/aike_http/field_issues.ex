@@ -16,39 +16,7 @@ defmodule AikeHttp.FieldIssues do
   end
 
   # Peri messages/content may contain the rejected value. Only allow safe metadata.
-  defp peri_description(%{content: %{code: code} = content}) do
-    case code do
-      "required" ->
-        {code, "This field is required."}
-
-      "invalid_type" ->
-        {code, "This field has an invalid type."}
-
-      "invalid_format" ->
-        {code, "This field has an invalid format."}
-
-      "too_short" ->
-        {code, "Must contain at least #{content.count} characters."}
-
-      "invalid_idempotency_key" ->
-        {code, "Provide one Idempotency-Key header containing 1 to 256 bytes."}
-
-      "invalid_upload" ->
-        {code, "Must be a multipart file upload."}
-
-      "invalid_base64" ->
-        {code, "Must be a non-empty base64-encoded document."}
-
-      "invalid_images" ->
-        {code, "Provide one or two images with distinct sides."}
-
-      "too_many_bytes" ->
-        {"too_long", "Must contain at most 1024 bytes."}
-
-      _ ->
-        {"invalid_value", "This field has an invalid value."}
-    end
-  end
+  defp peri_description(%{content: %{code: code} = content}), do: coded_description(code, content)
 
   defp peri_description(%{content: %{expected: _} = content}) do
     if Map.has_key?(content, :actual),
@@ -69,4 +37,28 @@ defmodule AikeHttp.FieldIssues do
   end
 
   defp peri_description(_), do: {"invalid_value", "This field has an invalid value."}
+
+  defp coded_description("required" = code, _), do: {code, "This field is required."}
+  defp coded_description("invalid_type" = code, _), do: {code, "This field has an invalid type."}
+
+  defp coded_description("invalid_format" = code, _),
+    do: {code, "This field has an invalid format."}
+
+  defp coded_description("too_short" = code, content),
+    do: {code, "Must contain at least #{content.count} characters."}
+
+  defp coded_description("invalid_idempotency_key" = code, _),
+    do: {code, "Provide one Idempotency-Key header containing 1 to 256 bytes."}
+
+  defp coded_description("invalid_upload" = code, _),
+    do: {code, "Must be a multipart file upload."}
+
+  defp coded_description("invalid_base64" = code, _),
+    do: {code, "Must be a non-empty base64-encoded document."}
+
+  defp coded_description("invalid_images" = code, _),
+    do: {code, "Provide one or two images with distinct sides."}
+
+  defp coded_description("too_many_bytes", _), do: {"too_long", "Must contain at most 1024 bytes."}
+  defp coded_description(_, _), do: {"invalid_value", "This field has an invalid value."}
 end

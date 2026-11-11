@@ -8,21 +8,24 @@ defmodule AikeAuth.HTTP do
     url = Application.get_env(:aike_auth, :url)
     token = Application.get_env(:aike_auth, :token)
 
-    with :ok <- validate_configuration(url, token) do
-      request = {
-        String.to_charlist(url),
-        [{~c"authorization", String.to_charlist("Bearer " <> token)}],
-        ~c"application/json",
-        Jason.encode!(%{accountId: account_id, secret: secret})
-      }
-
-      :httpc.request(:post, request, http_options(), body_format: :binary)
-      |> decode()
-    else
+    case validate_configuration(url, token) do
+      :ok -> introspect(url, token, account_id, secret)
       {:error, reason} -> unavailable(reason)
     end
   rescue
     _ -> unavailable(:unexpected_exception)
+  end
+
+  defp introspect(url, token, account_id, secret) do
+    request = {
+      String.to_charlist(url),
+      [{~c"authorization", String.to_charlist("Bearer " <> token)}],
+      ~c"application/json",
+      Jason.encode!(%{accountId: account_id, secret: secret})
+    }
+
+    :httpc.request(:post, request, http_options(), body_format: :binary)
+    |> decode()
   end
 
   defp validate_configuration(url, token) do
