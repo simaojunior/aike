@@ -1,8 +1,10 @@
 defmodule BackofficeWeb.Schemas.InputRules do
   @moduledoc "Custom Peri rules for byte limits, password policy and UUID syntax."
 
+  alias Backoffice.Accounts.Password
+
   def new_password(value) do
-    case Backoffice.Accounts.Password.validation_error(value) do
+    case Password.validation_error(value) do
       nil ->
         :ok
 

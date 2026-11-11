@@ -2,10 +2,11 @@ defmodule Backoffice.ServiceIdentityTest do
   use ExUnit.Case, async: false
   import Plug.Conn
   import Plug.Test
-  alias Backoffice.{Repo, Provisioning, Auth.ServiceAccount, Tenants.Company}
+  alias Backoffice.{Auth.ServiceAccount, Provisioning, Repo, Tenants.Company}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    :ok = Sandbox.checkout(Repo)
     old = Application.get_env(:backoffice, :introspection_token)
     Application.put_env(:backoffice, :introspection_token, "internal-secret")
 

@@ -2,9 +2,9 @@ defmodule Aike.CompanyProvisioningTest do
   alias Ecto.Adapters.SQL
   use ExUnit.Case, async: false
 
+  alias Backoffice.Auth.Secret
   alias Backoffice.Provisioning
   alias Backoffice.Repo
-  alias Backoffice.Auth.Secret
   alias Backoffice.Tenants.Company
 
   setup do

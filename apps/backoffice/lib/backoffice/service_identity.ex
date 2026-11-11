@@ -1,6 +1,6 @@
 defmodule Backoffice.ServiceIdentity do
   @moduledoc "Validates service credentials against the authoritative administrative database."
-  alias Backoffice.{Repo, Auth.Secret, Auth.ServiceAccount, Tenants.Company}
+  alias Backoffice.{Auth.Secret, Auth.ServiceAccount, Repo, Tenants.Company}
 
   def authenticate(account_id, secret)
       when is_binary(account_id) and byte_size(account_id) in 1..128 and

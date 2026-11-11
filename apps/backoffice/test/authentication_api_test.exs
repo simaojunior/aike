@@ -1,4 +1,5 @@
 defmodule Backoffice.AuthenticationApiTest do
+  alias Backoffice.Accounts.Password
   alias Ecto.Adapters.SQL
   use ExUnit.Case, async: false
   import Plug.Conn
@@ -209,10 +210,10 @@ defmodule Backoffice.AuthenticationApiTest do
   end
 
   test "password limits use characters for minimum and bytes for maximum" do
-    assert Backoffice.Accounts.Password.valid?(String.duplicate("é", 15))
-    refute Backoffice.Accounts.Password.valid?(String.duplicate("é", 14))
-    assert Backoffice.Accounts.Password.valid?(String.duplicate("a", 1024))
-    refute Backoffice.Accounts.Password.valid?(String.duplicate("a", 1025))
+    assert Password.valid?(String.duplicate("é", 15))
+    refute Password.valid?(String.duplicate("é", 14))
+    assert Password.valid?(String.duplicate("a", 1024))
+    refute Password.valid?(String.duplicate("a", 1025))
   end
 
   test "Peri rejects input before the bootstrap context executes any SQL" do

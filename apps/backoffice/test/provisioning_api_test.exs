@@ -4,8 +4,8 @@ defmodule Backoffice.ProvisioningApiTest do
   import Plug.Conn
   import Plug.Test
 
-  alias Backoffice.Repo
   alias Backoffice.Auth.{Secret, ServiceAccount}
+  alias Backoffice.Repo
   alias Backoffice.Tenants.Company
 
   setup do

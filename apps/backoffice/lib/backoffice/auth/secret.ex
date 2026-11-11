@@ -1,4 +1,9 @@
 defmodule Backoffice.Auth.Secret do
+  @moduledoc """
+  Hashes and verifies service account secrets.
+
+  Secrets use PBKDF2-HMAC-SHA256 with a random salt. The plaintext value is never stored.
+  """
   @type encoded_hash :: String.t()
   @doc "Hashes a service secret without ever persisting the plaintext value."
   @spec hash(String.t()) :: encoded_hash()

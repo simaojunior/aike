@@ -3,6 +3,8 @@ defmodule BackofficeWeb.ServiceIdentity do
   import Plug.Conn
   @path "/internal/v1/service-accounts/introspect"
 
+  alias BackofficeWeb.Schemas.Params
+
   def init(opts), do: opts
 
   def call(%{request_path: @path} = conn, _) do
@@ -23,24 +25,31 @@ defmodule BackofficeWeb.ServiceIdentity do
   defp handle(conn) do
     case read_body(conn, length: 4_096, read_length: 4_096, read_timeout: 3_000) do
       {:ok, body, conn} ->
-        with {:ok, params} <- Jason.decode(body),
-             {:ok, %{"accountId" => account, "secret" => secret}} <-
-               BackofficeWeb.Schemas.Params.introspect(params) do
-          case Backoffice.ServiceIdentity.authenticate(account, secret) do
-            {:ok, identity} -> respond(conn, 200, identity)
-            {:error, :unauthorized} -> respond(conn, 401, %{error: "unauthorized"})
-            _ -> respond(conn, 503, %{error: "service_unavailable"})
-          end
-        else
-          {:error, %Jason.DecodeError{}} -> respond(conn, 400, %{error: "invalid_json"})
-          {:error, errors} -> conn |> AikeHttp.Problem.validation(errors) |> halt()
-        end
+        introspect(conn, body)
 
       {:more, _, conn} ->
         respond(conn, 413, %{error: "payload_too_large"})
 
       {:error, _} ->
         respond(conn, 400, %{error: "invalid_request"})
+    end
+  end
+
+  defp introspect(conn, body) do
+    with {:ok, params} <- Jason.decode(body),
+         {:ok, %{"accountId" => account, "secret" => secret}} <- Params.introspect(params) do
+      authenticate(conn, account, secret)
+    else
+      {:error, %Jason.DecodeError{}} -> respond(conn, 400, %{error: "invalid_json"})
+      {:error, errors} -> conn |> AikeHttp.Problem.validation(errors) |> halt()
+    end
+  end
+
+  defp authenticate(conn, account, secret) do
+    case Backoffice.ServiceIdentity.authenticate(account, secret) do
+      {:ok, identity} -> respond(conn, 200, identity)
+      {:error, :unauthorized} -> respond(conn, 401, %{error: "unauthorized"})
+      _ -> respond(conn, 503, %{error: "service_unavailable"})
     end
   end
 

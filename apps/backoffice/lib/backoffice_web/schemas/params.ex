@@ -2,6 +2,7 @@ defmodule BackofficeWeb.Schemas.Params do
   @moduledoc "Peri schemas for public administrative inputs, before any domain or Ecto call."
   import Peri
   alias BackofficeWeb.Schemas.InputRules
+  alias KycCore.Auth.Scopes
 
   @name {:string, [min: 2, max: 160, regex: ~r/\S/u]}
   @email {:string, [max: 254, regex: ~r/\A[^\s@]+@[^\s@]+\.[^\s@]+\z/u]}
@@ -45,7 +46,7 @@ defmodule BackofficeWeb.Schemas.Params do
     "name" => {:required, @name},
     "companyId" => @uuid,
     "accountId" => {:string, [min: 3, max: 128]},
-    "scopes" => {:required, {:list, {:enum, KycCore.Auth.Scopes.all()}}}
+    "scopes" => {:required, {:list, {:enum, Scopes.all()}}}
   })
 
   defschema(:introspect, %{
