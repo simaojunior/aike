@@ -1,0 +1,129 @@
+x-service: &service
+  restart: unless-stopped
+  env_file: .env
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4000/health"]
+    interval: 10s
+    timeout: 3s
+    start_period: 20s
+    retries: 3
+
+x-identity: &identity
+  AIKE_AUTH_ALLOW_HTTP: "true"
+  BACKOFFICE_AUTH_URL: http://backoffice:4000/internal/v1/service-accounts/introspect
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: docker.io/chrislusf/seaweedfs:4.36
+    restart: unless-stopped
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    volumes:
+      - seaweedfs_data:/data
+      - ../dev/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs-init:
+    image: docker.io/chrislusf/seaweedfs:4.36
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "echo 's3.bucket.create -name ${S3_BUCKET}' | weed shell -master=seaweedfs:9333"
+
+  backoffice-migrate:
+    image: aike/backoffice:${AIKE_VERSION:-dev}
+    build: { context: .., args: { RELEASE: backoffice } }
+    env_file: .env
+    environment:
+      BACKOFFICE_DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/backoffice
+    command: ["/app/bin/server", "eval", "Code.require_file(\"scripts/migrate.exs\")"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  document-ocr-migrate:
+    image: aike/document_ocr:${AIKE_VERSION:-dev}
+    build: { context: .., args: { RELEASE: document_ocr } }
+    env_file: .env
+    environment:
+      <<: *identity
+      DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/document_ocr
+    command: ["/app/bin/server", "eval", "Code.require_file(\"scripts/migrate.exs\")"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  biometrics-migrate:
+    image: aike/biometrics:${AIKE_VERSION:-dev}
+    build: { context: .., args: { RELEASE: biometrics } }
+    env_file: .env
+    environment:
+      <<: *identity
+      BIOMETRICS_DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/biometrics
+    command: ["/app/bin/server", "eval", "Code.require_file(\"scripts/migrate.exs\")"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  backoffice:
+    <<: *service
+    image: aike/backoffice:${AIKE_VERSION:-dev}
+    environment:
+      BACKOFFICE_DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/backoffice
+    ports: ["127.0.0.1:4003:4000"]
+    depends_on:
+      backoffice-migrate: { condition: service_completed_successfully }
+
+  document_ocr:
+    <<: *service
+    image: aike/document_ocr:${AIKE_VERSION:-dev}
+    environment:
+      <<: *identity
+      DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/document_ocr
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      document-ocr-migrate: { condition: service_completed_successfully }
+      seaweedfs-init: { condition: service_completed_successfully }
+      backoffice: { condition: service_healthy }
+
+  document_classifier:
+    <<: *service
+    image: aike/document_classifier:${AIKE_VERSION:-dev}
+    build: { context: .., args: { RELEASE: document_classifier } }
+    environment:
+      <<: *identity
+    ports: ["127.0.0.1:4001:4000"]
+    depends_on:
+      backoffice: { condition: service_healthy }
+
+  biometrics:
+    <<: *service
+    image: aike/biometrics:${AIKE_VERSION:-dev}
+    environment:
+      <<: *identity
+      BIOMETRICS_DATABASE_URL: ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/biometrics
+    ports: ["127.0.0.1:4002:4000"]
+    depends_on:
+      biometrics-migrate: { condition: service_completed_successfully }
+      seaweedfs-init: { condition: service_completed_successfully }
+      backoffice: { condition: service_healthy }
+
+volumes:
+  postgres_data:
+  seaweedfs_data:

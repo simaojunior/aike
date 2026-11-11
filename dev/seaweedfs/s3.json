@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "aike-local",
+      "credentials": [
+        {"accessKey": "aike-local", "secretKey": "aike-local-secret"}
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

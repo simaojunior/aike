@@ -1,0 +1,13 @@
+_build
+deps
+.git
+.direnv
+.nix-mix
+.nix-hex
+.claude
+var
+dev
+docs
+erl_crash.dump
+.env
+*.md
