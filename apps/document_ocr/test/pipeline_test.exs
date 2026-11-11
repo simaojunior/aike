@@ -15,8 +15,10 @@ end
 
 defmodule DocumentOcr.TestSideOCR do
   @behaviour DocumentOcr.OCR.Engine
+  alias DocumentOcr.OCR.Fake
+
   def extract(bytes, opts) do
-    {:ok, raw} = DocumentOcr.OCR.Fake.extract(bytes, opts)
+    {:ok, raw} = Fake.extract(bytes, opts)
     [name | rest] = raw["text"]
     text = if bytes == "front.jpg", do: "FRONT PERSON", else: "BACK PERSON"
     {:ok, %{"text" => [%{name | "text" => text} | rest]}}
@@ -54,12 +56,14 @@ defmodule DocumentOcr.PipelineTest do
   import Plug.Test
   import Plug.Conn
   alias DocumentOcr.{Documents, Repo}
-  alias DocumentOcr.Documents.{Document, DocumentResult, DocumentArtifact}
+  alias DocumentOcr.Documents.{Document, DocumentArtifact, DocumentResult}
+  alias DocumentOcr.Documents.Processor
   alias DocumentOcr.Workers
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     original_engines = Application.fetch_env!(:document_ocr, :ocr_engines)
     original_storage = Application.fetch_env!(:aike_storage, :adapter)
 
@@ -527,17 +531,17 @@ defmodule DocumentOcr.PipelineTest do
   test "stale processing structs cannot overwrite terminal state" do
     id = create()
     pending = Documents.get_document!(id)
-    assert {:error, :invalid_transition} = DocumentOcr.Documents.Processor.complete(pending)
-    {:ok, processing} = DocumentOcr.Documents.Processor.start_processing(pending)
-    {:ok, completed} = DocumentOcr.Documents.Processor.complete(processing)
+    assert {:error, :invalid_transition} = Processor.complete(pending)
+    {:ok, processing} = Processor.start_processing(pending)
+    {:ok, completed} = Processor.complete(processing)
 
     assert {:error, :invalid_transition} =
-             DocumentOcr.Documents.Processor.fail(processing, "late", "late")
+             Processor.fail(processing, "late", "late")
 
     assert {:error, :invalid_transition} =
-             DocumentOcr.Documents.Processor.start_processing(pending)
+             Processor.start_processing(pending)
 
-    assert {:ok, _} = DocumentOcr.Documents.Processor.complete(completed)
+    assert {:ok, _} = Processor.complete(completed)
     assert Documents.get_document!(id).status == "completed"
   end
 

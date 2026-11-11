@@ -28,26 +28,27 @@ defmodule DocumentOcr.OCR.TesseractPython do
         "aike-ocr-" <> Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false)
       )
 
-    with :ok <- File.mkdir(directory) do
-      try do
-        with :ok <- File.chmod(directory, 0o700),
-             :ok <- File.write(Path.join(directory, "input"), bytes),
-             {:ok, output} <- run(directory),
-             {:ok, %{"text" => lines}} when is_list(lines) <- Jason.decode(output) do
-          {:ok, %{"text" => lines}}
-        else
-          {:error, :invalid_image} -> {:error, :invalid_image}
-          {:error, {:unavailable, _}} = error -> error
-          _ -> unavailable(:invalid_output)
-        end
-      after
-        File.rm_rf(directory)
-      end
-    else
+    case File.mkdir(directory) do
+      :ok -> read_in(directory, bytes)
       {:error, _} -> unavailable(:temporary_directory_failed)
     end
   rescue
     _ -> unavailable(:runtime_exception)
+  end
+
+  defp read_in(directory, bytes) do
+    with :ok <- File.chmod(directory, 0o700),
+         :ok <- File.write(Path.join(directory, "input"), bytes),
+         {:ok, output} <- run(directory),
+         {:ok, %{"text" => lines}} when is_list(lines) <- Jason.decode(output) do
+      {:ok, %{"text" => lines}}
+    else
+      {:error, :invalid_image} -> {:error, :invalid_image}
+      {:error, {:unavailable, _}} = error -> error
+      _ -> unavailable(:invalid_output)
+    end
+  after
+    File.rm_rf(directory)
   end
 
   defp run(directory) do

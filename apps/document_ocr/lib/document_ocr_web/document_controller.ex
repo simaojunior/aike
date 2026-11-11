@@ -4,12 +4,13 @@ defmodule DocumentOcrWeb.DocumentController do
   action_fallback(DocumentOcrWeb.FallbackController)
   alias DocumentOcr.{Completion, Documents}
   alias DocumentOcrWeb.{DocumentInput, DocumentJSON, Preference}
+  alias DocumentOcrWeb.Schemas.DocumentParams
 
   plug(DocumentOcrWeb.ValidateParams,
-    create: &DocumentOcrWeb.Schemas.DocumentParams.create/1,
-    reprocess: &DocumentOcrWeb.Schemas.DocumentParams.reprocess/1,
-    show: &DocumentOcrWeb.Schemas.DocumentParams.resource/1,
-    cancel: &DocumentOcrWeb.Schemas.DocumentParams.resource/1
+    create: &DocumentParams.create/1,
+    reprocess: &DocumentParams.reprocess/1,
+    show: &DocumentParams.resource/1,
+    cancel: &DocumentParams.resource/1
   )
 
   def create(conn, params) do

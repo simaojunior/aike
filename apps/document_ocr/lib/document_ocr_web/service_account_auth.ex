@@ -1,4 +1,9 @@
 defmodule DocumentOcrWeb.ServiceAccountAuth do
+  @moduledoc """
+  Service account scope check of the OCR API.
+
+  It calls `AikeAuth.Plug` with the scopes of the route.
+  """
   def init(opts), do: opts
 
   def call(conn, opts) do

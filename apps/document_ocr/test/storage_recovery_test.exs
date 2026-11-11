@@ -7,13 +7,14 @@ end
 
 defmodule DocumentOcr.StorageRecoveryTest do
   use ExUnit.Case, async: false
-  alias AikeStorage.{Blobs, Reconciliation}
   alias AikeStorage.Adapter.Local
+  alias AikeStorage.{Blobs, Reconciliation}
   alias DocumentOcr.{Documents, Repo}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     adapter = Application.fetch_env!(:aike_storage, :adapter)
     root = Application.fetch_env!(:aike_storage, :local_root)
     directory = Path.join(System.tmp_dir!(), "aike-recovery-#{Ecto.UUID.generate()}")

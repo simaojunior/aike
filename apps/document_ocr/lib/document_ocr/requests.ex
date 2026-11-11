@@ -1,7 +1,7 @@
 defmodule DocumentOcr.Requests do
   @moduledoc "Persists replay bindings in the same transaction as the resource and its job."
-  alias DocumentOcr.Requests.Request
   alias AikeStorage.Transaction
+  alias DocumentOcr.Requests.Request
 
   @spec run(module(), atom(), String.t(), term(), String.t(), (-> term()), (String.t() -> term())) ::
           term()

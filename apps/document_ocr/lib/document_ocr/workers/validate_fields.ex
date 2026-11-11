@@ -1,4 +1,10 @@
 defmodule DocumentOcr.Workers.ValidateFields do
+  @moduledoc """
+  Oban worker for the validate stage of the OCR pipeline.
+
+  It runs the stage in `DocumentOcr.Workers.Pipeline`. Oban keeps one job for each document
+  run.
+  """
   use Oban.Worker,
     queue: :default,
     max_attempts: 3,
@@ -8,6 +14,8 @@ defmodule DocumentOcr.Workers.ValidateFields do
       states: [:available, :scheduled, :executing, :retryable, :completed]
     ]
 
+  alias DocumentOcr.Workers.Pipeline
+
   @impl true
-  def perform(job), do: DocumentOcr.Workers.Pipeline.perform(:validate, job)
+  def perform(job), do: Pipeline.perform(:validate, job)
 end

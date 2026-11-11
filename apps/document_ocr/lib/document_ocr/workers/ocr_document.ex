@@ -1,4 +1,10 @@
 defmodule DocumentOcr.Workers.OcrDocument do
+  @moduledoc """
+  Oban worker for the OCR stage of the OCR pipeline.
+
+  It runs the stage in `DocumentOcr.Workers.Pipeline`. Oban keeps one job for each document
+  run.
+  """
   use Oban.Worker,
     queue: :ocr,
     max_attempts: 3,
@@ -8,6 +14,8 @@ defmodule DocumentOcr.Workers.OcrDocument do
       states: [:available, :scheduled, :executing, :retryable, :completed]
     ]
 
+  alias DocumentOcr.Workers.Pipeline
+
   @impl true
-  def perform(job), do: DocumentOcr.Workers.Pipeline.perform(:ocr, job)
+  def perform(job), do: Pipeline.perform(:ocr, job)
 end

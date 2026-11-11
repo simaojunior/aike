@@ -8,6 +8,7 @@ defmodule DocumentOcr.Documents do
   alias DocumentOcr.Documents.Processor
   alias DocumentOcr.ProcessingConfig
   alias DocumentOcr.Repo
+  alias DocumentOcr.Workers.PreprocessDocument
   @type result :: {:ok, map()} | {:error, term()} | {:error, term(), term(), map()}
 
   @spec get_document(String.t()) :: Document.t() | nil
@@ -68,7 +69,7 @@ defmodule DocumentOcr.Documents do
       Ecto.Multi.new()
       |> Ecto.Multi.insert(:document, changeset)
       |> Oban.insert(:job, fn %{document: doc} ->
-        DocumentOcr.Workers.PreprocessDocument.new(job_args(doc))
+        PreprocessDocument.new(job_args(doc))
       end)
       |> Repo.transaction()
     end
@@ -88,43 +89,47 @@ defmodule DocumentOcr.Documents do
   def reprocess_document(id, version, request_id \\ Ecto.UUID.generate()) do
     with {:ok, id} <- Ecto.UUID.cast(id),
          {:ok, profile} <- ProcessingConfig.capture(version) do
-      Repo.transaction(fn ->
-        document = lock(id) || Repo.rollback(:document_not_found)
-        # Composite foreign keys prohibit keeping results from an earlier run.
-        :ok = DocumentRepo.clear_run(id)
-
-        with {:ok, document} <- Processor.restart(document, profile, request_id),
-             {:ok, _job} <-
-               document
-               |> job_args()
-               |> DocumentOcr.Workers.PreprocessDocument.new()
-               |> Oban.insert() do
-          document
-        else
-          {:error, reason} -> Repo.rollback(reason)
-        end
-      end)
+      Repo.transaction(fn -> restart(id, profile, request_id) end)
     else
       :error -> {:error, :document_not_found}
       error -> error
     end
   end
 
+  defp restart(id, profile, request_id) do
+    document = lock(id) || Repo.rollback(:document_not_found)
+    # Composite foreign keys prohibit keeping results from an earlier run.
+    :ok = DocumentRepo.clear_run(id)
+
+    case Processor.restart(document, profile, request_id) do
+      {:ok, restarted} -> enqueue_preprocess(restarted)
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
+
+  defp enqueue_preprocess(document) do
+    case document |> job_args() |> PreprocessDocument.new() |> Oban.insert() do
+      {:ok, _job} -> document
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
+
   @spec cancel_document(String.t()) :: {:ok, Document.t()} | {:error, term()}
   def cancel_document(id) do
-    with {:ok, id} <- Ecto.UUID.cast(id) do
-      Repo.transaction(fn ->
-        document = lock(id) || Repo.rollback(:document_not_found)
-
-        with :ok <- cancellable(document.status),
-             {:ok, cancelled} <- Processor.cancel(document) do
-          cancelled
-        else
-          {:error, reason} -> Repo.rollback(reason)
-        end
-      end)
-    else
+    case Ecto.UUID.cast(id) do
+      {:ok, id} -> Repo.transaction(fn -> cancel_locked(id) end)
       :error -> {:error, :document_not_found}
+    end
+  end
+
+  defp cancel_locked(id) do
+    document = lock(id) || Repo.rollback(:document_not_found)
+
+    with :ok <- cancellable(document.status),
+         {:ok, cancelled} <- Processor.cancel(document) do
+      cancelled
+    else
+      {:error, reason} -> Repo.rollback(reason)
     end
   end
 

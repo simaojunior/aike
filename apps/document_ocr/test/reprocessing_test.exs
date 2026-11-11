@@ -1,7 +1,9 @@
 defmodule DocumentOcr.ReprocessingTestEngine do
   @behaviour DocumentOcr.OCR.Engine
+  alias DocumentOcr.OCR.Fake
+
   def extract(bytes, opts) do
-    {:ok, raw} = DocumentOcr.OCR.Fake.extract(bytes, opts)
+    {:ok, raw} = Fake.extract(bytes, opts)
     [name | rest] = raw["text"]
     {:ok, %{"text" => [%{name | "text" => "SASUKE UCHIHA"} | rest]}}
   end
@@ -15,7 +17,10 @@ defmodule DocumentOcr.ReprocessingTest do
   import Ecto.Query
   alias DocumentOcr.{Documents, Repo}
   alias DocumentOcr.Documents.{DocumentArtifact, DocumentResult, Processor}
+  alias DocumentOcr.Extraction.CNH
+  alias DocumentOcr.OCR.Fake
   alias DocumentOcr.Workers
+  alias Ecto.Adapters.SQL.Sandbox
 
   @workers [
     Workers.PreprocessDocument,
@@ -26,8 +31,8 @@ defmodule DocumentOcr.ReprocessingTest do
   ]
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     keys = [:ocr_engine, :ocr_engine_version, :ocr_engines, :pipeline_version]
     original = Map.new(keys, &{&1, Application.fetch_env!(:document_ocr, &1)})
 
@@ -132,8 +137,8 @@ defmodule DocumentOcr.ReprocessingTest do
 
   test "stale structs cannot change status, artifacts or result after restart" do
     original = create()
-    {:ok, raw} = DocumentOcr.OCR.Fake.extract("bytes", [])
-    {:ok, data} = DocumentOcr.Extraction.CNH.extract(raw)
+    {:ok, raw} = Fake.extract("bytes", [])
+    {:ok, data} = CNH.extract(raw)
     data = DocumentOcr.Validation.validate_result(data)
     {:ok, current} = Documents.reprocess_document(original.id, "2026.11.0")
     assert {:error, :stale_run} = Processor.start_processing(original)

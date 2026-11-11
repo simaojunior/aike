@@ -13,11 +13,12 @@ defmodule DocumentOcr.ServiceAccountAuthTest do
   use ExUnit.Case, async: false
   import Plug.Test
   import Plug.Conn
-  alias DocumentOcr.{Repo, Documents}
+  alias DocumentOcr.{Documents, Repo}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     adapter = Application.get_env(:aike_auth, :adapter)
     required = Application.get_env(:document_ocr, :service_account_auth_required, false)
     Application.put_env(:aike_auth, :adapter, DocumentOcr.TestIdentity)

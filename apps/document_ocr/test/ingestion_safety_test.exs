@@ -1,13 +1,14 @@
 defmodule DocumentOcr.IngestionSafetyTest do
   use ExUnit.Case, async: false
   import Ecto.Query
-  alias DocumentOcr.{Documents, Repo}
-  alias AikeStorage.{Blob, Blobs, Ingestion}
   alias AikeStorage.Adapter.Fake
+  alias AikeStorage.{Blob, Blobs, Ingestion}
+  alias DocumentOcr.{Documents, Repo}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     Fake.reset()
     :ok
   end

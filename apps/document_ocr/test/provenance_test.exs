@@ -1,17 +1,21 @@
 defmodule DocumentOcr.AlternativeTestEngine do
   @behaviour DocumentOcr.OCR.Engine
+  alias DocumentOcr.OCR.Fake
+
   @impl true
   def extract(bytes, opts) do
     send(self(), {:alternative_engine, bytes, opts})
-    {:ok, raw} = DocumentOcr.OCR.Fake.extract(bytes, opts)
+    {:ok, raw} = Fake.extract(bytes, opts)
     [name | rest] = raw["text"]
     {:ok, %{"text" => [%{name | "text" => "ANA TESTE"} | rest]}}
   end
 end
 
 defmodule DocumentOcr.AlternativeTestExtractor do
+  alias DocumentOcr.Extraction.CNH
+
   def extract(raw) do
-    {:ok, data} = DocumentOcr.Extraction.CNH.extract(raw)
+    {:ok, data} = CNH.extract(raw)
     {:ok, update_in(data, ["fields", "full_name", "value"], &("ALT " <> &1))}
   end
 end
@@ -21,9 +25,12 @@ defmodule DocumentOcr.ProvenanceTest do
   use Oban.Testing, repo: DocumentOcr.Repo
   import Plug.Test
   import Plug.Conn
-  alias DocumentOcr.{Documents, Repo, ProcessingConfig}
+  alias DocumentOcr.{Documents, ProcessingConfig, Repo}
   alias DocumentOcr.Documents.{Document, DocumentResult}
+  alias DocumentOcr.Extraction.CNH
+  alias DocumentOcr.OCR.Fake
   alias DocumentOcr.Workers
+  alias Ecto.Adapters.SQL.Sandbox
 
   @keys [
     :ocr_engine,
@@ -34,8 +41,8 @@ defmodule DocumentOcr.ProvenanceTest do
     :extractors
   ]
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     original = Map.new(@keys, &{&1, Application.fetch_env!(:document_ocr, &1)})
 
     Application.put_env(
@@ -149,10 +156,10 @@ defmodule DocumentOcr.ProvenanceTest do
   test "retry uses the pinned engine and never falls back when registration is removed" do
     alternative()
     document = create()
-    Application.put_env(:document_ocr, :ocr_engine, DocumentOcr.OCR.Fake)
+    Application.put_env(:document_ocr, :ocr_engine, Fake)
     Application.put_env(:document_ocr, :ocr_engine_version, "fake-1")
     registered = Application.fetch_env!(:document_ocr, :ocr_engines)
-    Application.put_env(:document_ocr, :ocr_engines, [{DocumentOcr.OCR.Fake, "fake-1"}])
+    Application.put_env(:document_ocr, :ocr_engines, [{Fake, "fake-1"}])
     assert %{success: 1} = Oban.drain_queue(queue: :preprocess)
     assert %{failure: 1, success: 0} = Oban.drain_queue(queue: :ocr)
     assert Documents.get_document!(document.id).status == "processing"
@@ -220,8 +227,8 @@ defmodule DocumentOcr.ProvenanceTest do
 
   test "persisting again copies captured metadata despite later config changes" do
     document = create()
-    {:ok, raw} = DocumentOcr.OCR.Fake.extract("bytes", [])
-    {:ok, data} = DocumentOcr.Extraction.CNH.extract(raw)
+    {:ok, raw} = Fake.extract("bytes", [])
+    {:ok, data} = CNH.extract(raw)
     data = DocumentOcr.Validation.validate_result(data)
     {:ok, original} = Documents.save_result(document, data)
     alternative()

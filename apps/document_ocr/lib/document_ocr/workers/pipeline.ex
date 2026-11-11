@@ -1,11 +1,18 @@
 defmodule DocumentOcr.Workers.Pipeline do
+  @moduledoc """
+  Runs one stage of the document pipeline.
+
+  A stage checks that the run is current and skips work that is already done. A failure that
+  retries cannot fix ends the document with an error code. Error details never reach the job
+  payload.
+  """
   alias DocumentOcr.{
     Documents,
+    Extraction,
+    OCR,
+    ProcessingConfig,
     Repo,
     StorageAdapter,
-    OCR,
-    Extraction,
-    ProcessingConfig,
     Validation
   }
 
@@ -83,39 +90,36 @@ defmodule DocumentOcr.Workers.Pipeline do
 
   defp failure(id, run_id, job, reason \\ :processing_failed) do
     # Keep external errors (which can contain identity data) out of Oban's error payload.
-    case Repo.transaction(fn ->
-           case Documents.lock(id) do
-             nil ->
-               {:cancel, :document_not_found}
-
-             %{run_id: current_run_id} when current_run_id != run_id ->
-               {:cancel, :stale_run}
-
-             %{status: status} = document when status in ["pending", "processing"] ->
-               {:ok, document} = Processor.start_processing(document)
-
-               _ =
-                 if job.attempt >= job.max_attempts do
-                   {:ok, _} =
-                     Processor.fail(
-                       document,
-                       failure_code(reason),
-                       failure_message(reason)
-                     )
-                 end
-
-               {:error, :processing_failed}
-
-             _ ->
-               :ok
-           end
-         end) do
+    case Repo.transaction(fn -> record_failure(Documents.lock(id), run_id, job, reason) end) do
       {:ok, result} -> result
       {:error, _} -> {:error, :processing_failed}
     end
   rescue
     _ -> {:error, :processing_failed}
   end
+
+  defp record_failure(nil, _run_id, _job, _reason), do: {:cancel, :document_not_found}
+
+  defp record_failure(%{run_id: current_run_id}, run_id, _job, _reason)
+       when current_run_id != run_id,
+       do: {:cancel, :stale_run}
+
+  defp record_failure(%{status: status} = document, _run_id, job, reason)
+       when status in ["pending", "processing"] do
+    {:ok, document} = Processor.start_processing(document)
+    exhaust_retries(document, job, reason)
+    {:error, :processing_failed}
+  end
+
+  defp record_failure(_document, _run_id, _job, _reason), do: :ok
+
+  defp exhaust_retries(document, %{attempt: attempt, max_attempts: max_attempts}, reason)
+       when attempt >= max_attempts do
+    {:ok, _} = Processor.fail(document, failure_code(reason), failure_message(reason))
+    :ok
+  end
+
+  defp exhaust_retries(_document, _job, _reason), do: :ok
 
   defp failure_code(:timeout), do: "processing_timeout"
   defp failure_code(_), do: "processing_failed"
@@ -125,28 +129,26 @@ defmodule DocumentOcr.Workers.Pipeline do
   defp run(:preprocess, document) do
     with {:ok, _} <- ProcessingConfig.metadata(document),
          {:ok, document} <- Processor.start_processing(document),
-         {:ok, images} <- load_images(document),
-         :ok <-
-           Documents.save_artifact_and_enqueue(
-             document,
-             "preprocessed",
-             %{"images" => images},
-             Workers.OcrDocument
-           ),
-         do: :ok
+         {:ok, images} <- load_images(document) do
+      Documents.save_artifact_and_enqueue(
+        document,
+        "preprocessed",
+        %{"images" => images},
+        Workers.OcrDocument
+      )
+    end
   end
 
   defp run(:ocr, document) do
     with %{data: %{"images" => images}} <- Documents.artifact(document, "preprocessed"),
-         {:ok, outputs} <- extract_images(images, document),
-         :ok <-
-           Documents.save_artifact_and_enqueue(
-             document,
-             "raw_ocr",
-             %{"images" => outputs},
-             Workers.ExtractFields
-           ),
-         do: :ok
+         {:ok, outputs} <- extract_images(images, document) do
+      Documents.save_artifact_and_enqueue(
+        document,
+        "raw_ocr",
+        %{"images" => outputs},
+        Workers.ExtractFields
+      )
+    end
   end
 
   defp run(:extract, %{document_type: "auto"} = document) do
@@ -174,13 +176,11 @@ defmodule DocumentOcr.Workers.Pipeline do
   defp run(:validate, document) do
     %{data: data} = Documents.artifact(document, "extracted")
 
-    with :ok <-
-           Documents.save_result_and_enqueue(
-             document,
-             Validation.validate_result(data),
-             Workers.CompleteDocument
-           ),
-         do: :ok
+    Documents.save_result_and_enqueue(
+      document,
+      Validation.validate_result(data),
+      Workers.CompleteDocument
+    )
   end
 
   defp run(:complete, document) do

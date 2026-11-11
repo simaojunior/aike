@@ -1,11 +1,11 @@
 defmodule DocumentOcr.IngestionConcurrencyTest do
   use ExUnit.Case, async: false
   import Ecto.Query
-  alias Ecto.Adapters.SQL.Sandbox
+  alias AikeStorage.Adapter.Local
+  alias AikeStorage.{Blob, Ingestion, Reconciliation}
   alias DocumentOcr.{Documents, Repo}
   alias DocumentOcr.Documents.Document
-  alias AikeStorage.{Blob, Ingestion, Reconciliation}
-  alias AikeStorage.Adapter.Local
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
     root = Path.join(System.tmp_dir!(), "aike-crash-#{Ecto.UUID.generate()}")

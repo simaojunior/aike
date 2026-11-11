@@ -1,4 +1,9 @@
 defmodule DocumentOcr.Application do
+  @moduledoc """
+  OTP application of the OCR service.
+
+  It starts the repository, the HTTP endpoint, Oban and the completion registry.
+  """
   use Application
 
   def start(_type, _args) do

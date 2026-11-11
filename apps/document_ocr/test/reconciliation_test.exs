@@ -4,10 +4,11 @@ defmodule DocumentOcr.ReconciliationTest do
   import Ecto.Query
   alias DocumentOcr.{Documents, Reconciliation, Repo}
   alias DocumentOcr.Documents.Processor
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+    :ok = Sandbox.checkout(Repo)
+    Sandbox.mode(Repo, {:shared, self()})
     :ok
   end
 

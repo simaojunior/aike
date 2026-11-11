@@ -3,9 +3,10 @@ defmodule DocumentOcr.QueueMetricsTest do
   import Plug.Conn
   import Plug.Test
   alias DocumentOcr.Repo
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    :ok = Sandbox.checkout(Repo)
     original = Application.fetch_env(:document_ocr, :metrics_token)
     Application.put_env(:document_ocr, :metrics_token, "scrape-secret")
 

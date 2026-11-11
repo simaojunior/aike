@@ -1,4 +1,10 @@
 defmodule DocumentOcr.Workers.ExtractFields do
+  @moduledoc """
+  Oban worker for the extract stage of the OCR pipeline.
+
+  It runs the stage in `DocumentOcr.Workers.Pipeline`. Oban keeps one job for each document
+  run.
+  """
   use Oban.Worker,
     queue: :default,
     max_attempts: 3,
@@ -8,6 +14,8 @@ defmodule DocumentOcr.Workers.ExtractFields do
       states: [:available, :scheduled, :executing, :retryable, :completed]
     ]
 
+  alias DocumentOcr.Workers.Pipeline
+
   @impl true
-  def perform(job), do: DocumentOcr.Workers.Pipeline.perform(:extract, job)
+  def perform(job), do: Pipeline.perform(:extract, job)
 end

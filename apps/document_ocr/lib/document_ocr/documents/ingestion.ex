@@ -1,10 +1,10 @@
 defmodule DocumentOcr.Documents.Ingestion do
   @moduledoc "Atomic document upload ownership and tenant-scoped replay bindings."
+  alias AikeStorage.Transaction
   alias DocumentOcr.{Documents, ProcessingConfig, Repo}
   alias DocumentOcr.Documents.{Document, DocumentRepo}
-  alias KycCore.Idempotency
   alias DocumentOcr.Requests
-  alias AikeStorage.Transaction
+  alias KycCore.Idempotency
 
   @spec create(map(), [map()]) :: term()
   def create(attrs, uploads) do
@@ -14,29 +14,34 @@ defmodule DocumentOcr.Documents.Ingestion do
     with true <- changeset.valid?,
          {:ok, profile} <- ProcessingConfig.capture(),
          {:ok, _} <- extractor(attrs.document_type, profile) do
-      fingerprint =
-        Idempotency.fingerprint(
-          {attrs
-           |> Map.take([:document_type, :country])
-           |> Map.put(:external_id, Map.get(attrs, :requested_external_id, attrs[:external_id])),
-           signature(uploads)}
-        )
-
-      AikeStorage.Ingestion.run(DocumentOcr.BlobOwner.owner(), uploads, fn blobs ->
-        Requests.run(
-          Repo,
-          :ocr,
-          attrs.app_id,
-          attrs[:idempotency_key],
-          fingerprint,
-          fn -> find_or_create(attrs, uploads, blobs, profile) end,
-          &replay/1
-        )
-      end)
+      store(attrs, uploads, profile, fingerprint(attrs, uploads))
     else
       false -> {:error, :invalid_request}
       error -> error
     end
+  end
+
+  defp fingerprint(attrs, uploads) do
+    Idempotency.fingerprint(
+      {attrs
+       |> Map.take([:document_type, :country])
+       |> Map.put(:external_id, Map.get(attrs, :requested_external_id, attrs[:external_id])),
+       signature(uploads)}
+    )
+  end
+
+  defp store(attrs, uploads, profile, fingerprint) do
+    AikeStorage.Ingestion.run(DocumentOcr.BlobOwner.owner(), uploads, fn blobs ->
+      Requests.run(
+        Repo,
+        :ocr,
+        attrs.app_id,
+        attrs[:idempotency_key],
+        fingerprint,
+        fn -> find_or_create(attrs, uploads, blobs, profile) end,
+        &replay/1
+      )
+    end)
   end
 
   # A type without an extractor in the active configuration would only fail later in a worker.

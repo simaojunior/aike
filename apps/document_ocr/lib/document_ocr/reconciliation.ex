@@ -10,10 +10,15 @@ defmodule DocumentOcr.Reconciliation do
   @active ~w(available scheduled executing retryable)
 
   def run(limit \\ 100) when is_integer(limit) and limit > 0 and limit <= 1000 do
+    limit |> candidates() |> repair_candidates()
+  rescue
+    _ -> {:error, :reconciliation_failed}
+  end
+
+  defp candidates(limit) do
     cutoff = DateTime.add(DateTime.utc_now(), -3600)
 
-    candidates =
-      from(document in Document,
+    from(document in Document,
         left_join: job in Oban.Job,
         on:
           fragment("?->>'document_id' = ?::text", job.args, document.id) and
@@ -33,7 +38,9 @@ defmodule DocumentOcr.Reconciliation do
         select: {document.id, document.run_id}
       )
       |> Repo.all()
+  end
 
+  defp repair_candidates(candidates) do
     Enum.reduce_while(candidates, {:ok, 0}, fn {id, run_id}, {:ok, count} ->
       case reconcile(id, run_id) do
         {:ok, :repaired} -> {:cont, {:ok, count + 1}}
@@ -41,8 +48,6 @@ defmodule DocumentOcr.Reconciliation do
         {:error, _} -> {:halt, {:error, :reconciliation_failed}}
       end
     end)
-  rescue
-    _ -> {:error, :reconciliation_failed}
   end
 
   def reconcile(id, expected_run_id) do

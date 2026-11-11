@@ -1,4 +1,10 @@
 defmodule DocumentOcr.OCR do
+  @moduledoc """
+  Reads text from an image with the configured OCR engine.
+
+  The engine and its version come from the processing profile, so a document keeps the
+  engine version that it captured.
+  """
   alias DocumentOcr.ProcessingConfig
 
   def extract(image, opts \\ []) do

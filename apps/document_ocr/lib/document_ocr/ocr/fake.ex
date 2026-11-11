@@ -1,4 +1,9 @@
 defmodule DocumentOcr.OCR.Fake do
+  @moduledoc """
+  Fake OCR engine for tests.
+
+  It returns fixed synthetic text and never reads the image.
+  """
   @behaviour DocumentOcr.OCR.Engine
   @impl true
   def extract(_image, _opts) do

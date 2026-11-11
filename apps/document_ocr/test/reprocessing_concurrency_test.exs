@@ -15,9 +15,9 @@ end
 defmodule DocumentOcr.ReprocessingConcurrencyTest do
   use ExUnit.Case, async: false
   import Ecto.Query
-  alias Ecto.Adapters.SQL.Sandbox
   alias DocumentOcr.{Documents, Repo, Workers}
   alias DocumentOcr.Documents.{Document, DocumentArtifact, DocumentResult}
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
     # Real independent PostgreSQL connections: a shared sandbox connection cannot

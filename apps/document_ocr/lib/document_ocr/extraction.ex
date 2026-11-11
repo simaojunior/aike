@@ -1,4 +1,9 @@
 defmodule DocumentOcr.Extraction do
+  @moduledoc """
+  Extracts structured fields from the OCR text of a document.
+
+  The extractor module comes from the extractor version that the document captured.
+  """
   alias DocumentOcr.ProcessingConfig
 
   def extract(raw_ocr, document) do
