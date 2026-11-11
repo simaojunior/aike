@@ -1,4 +1,9 @@
 defmodule KycCore.DocumentStatus do
+  @moduledoc """
+  Status values of a document.
+
+  The services share these values so that their status checks agree.
+  """
   @type value :: String.t()
   @values ["pending", "processing", "completed", "requires_confirmation", "failed", "rejected"]
 
