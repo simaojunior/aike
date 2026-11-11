@@ -10,7 +10,9 @@ defmodule AikeStorage.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.18",
-      deps: [{:ecto, "~> 3.13"}]
+      deps: [{:ecto, "~> 3.13"}, {:req, "~> 0.5"}, {:plug, "~> 1.18", only: :test}]
     ]
   end
+
+  def application, do: [extra_applications: [:xmerl]]
 end
