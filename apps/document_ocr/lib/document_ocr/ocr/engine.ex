@@ -4,8 +4,10 @@ defmodule DocumentOcr.OCR.Engine do
 
   The pipeline passes :document_type and the captured :engine_version in opts.
   An adapter must honor the registered version or return an error; it must not silently
-  substitute a different model. Output for the current CNH extractor is a string-keyed
-  map with a "text" list of %{"text" => string, "confidence" => number_in_0_to_1}.
+  substitute a different model. Output is a string-keyed map with a "text" list of
+  %{"text" => string, "confidence" => number_in_0_to_1}. Engines read by
+  DocumentOcr.Extraction.CNHLabels also give each line "bbox" ([left, top, width, height])
+  and "source" (the OCR pass that produced it).
   No storage, Ecto, Oban or controller calls belong in an adapter.
   """
   @callback extract(binary(), keyword()) :: {:ok, map()} | {:error, term()}

@@ -1,74 +1,64 @@
+defmodule DocumentOcr.TestIdentity do
+  def authenticate(account, "secret") do
+    scopes = if account == "read_only", do: ["ocr:read"], else: ["ocr:write", "ocr:read"]
+
+    {:ok,
+     %{account_id: account, company_id: "44444444-4444-4444-8444-444444444444", scopes: scopes}}
+  end
+
+  def authenticate(_, _), do: {:error, :unauthorized}
+end
+
 defmodule DocumentOcr.ServiceAccountAuthTest do
   use ExUnit.Case, async: false
   import Plug.Test
   import Plug.Conn
-
   alias DocumentOcr.{Repo, Documents}
-  alias KycCore.Auth.{Secret, ServiceAccount}
-  alias KycCore.Tenants.Company
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    company = Repo.insert!(%Company{name: "Acme"})
-    old_required = Application.get_env(:document_ocr, :service_account_auth_required, false)
+    adapter = Application.get_env(:aike_auth, :adapter)
+    required = Application.get_env(:document_ocr, :service_account_auth_required, false)
+    Application.put_env(:aike_auth, :adapter, DocumentOcr.TestIdentity)
     Application.put_env(:document_ocr, :service_account_auth_required, true)
 
     on_exit(fn ->
-      Application.put_env(:document_ocr, :service_account_auth_required, old_required)
+      if adapter,
+        do: Application.put_env(:aike_auth, :adapter, adapter),
+        else: Application.delete_env(:aike_auth, :adapter)
+
+      Application.put_env(:document_ocr, :service_account_auth_required, required)
     end)
-
-    {:ok, company: company}
   end
 
-  test "valid ApiKey derives company and service account from the database", %{company: company} do
-    {:ok, account} =
-      Repo.insert(%ServiceAccount{
-        account_id: "svc_acme_prod_123",
-        secret_hash: Secret.hash("sk_live_987654321"),
-        scopes: ["ocr:write", "ocr:read"],
-        company_id: company.id,
-        name: "Acme Main Backend"
-      })
-
-    body = %{
-      "external_id" => "user-9876",
-      "document_type" => "cnh",
-      "country" => "BR",
-      "images" => [
-        %{"side" => "front", "source" => %{"type" => "object_storage", "key" => "front.jpg"}}
-      ],
-      "app_id" => "attacker-company"
-    }
-
-    conn =
-      conn(:post, "/v1/documents", Jason.encode!(body))
-      |> put_req_header("content-type", "application/json")
-      |> put_req_header("authorization", "ApiKey svc_acme_prod_123:sk_live_987654321")
-      |> DocumentOcrWeb.Endpoint.call([])
-
-    assert conn.status == 202
-    id = Jason.decode!(conn.resp_body)["id"]
-    assert Documents.get_document!(id).app_id == account.company_id
+  defp request(body, credentials) do
+    conn(:post, "/v1/extractions", Jason.encode!(body))
+    |> put_req_header("content-type", "application/json")
+    |> put_req_header("authorization", credentials)
+    |> DocumentOcrWeb.Endpoint.call([])
   end
 
-  test "invalid secret is unauthorized and missing scope is forbidden", %{company: company} do
-    Repo.insert!(%ServiceAccount{
-      account_id: "svc_read_only",
-      secret_hash: Secret.hash("secret"),
-      scopes: ["ocr:read"],
-      company_id: company.id,
-      name: "Read only"
-    })
+  test "identity boundary determines tenant, ignoring a tenant supplied in the body" do
+    response =
+      request(
+        %{
+          "externalId" => "user-9876",
+          "documentType" => "cnh",
+          "country" => "BR",
+          "images" => [%{"side" => "front", "image" => Base.encode64("front.jpg")}],
+          "appId" => "attacker-company"
+        },
+        "ApiKey writer:secret"
+      )
 
-    request = fn token ->
-      conn(:post, "/v1/documents", Jason.encode!(%{"app_id" => "ignored"}))
-      |> put_req_header("content-type", "application/json")
-      |> put_req_header("authorization", token)
-      |> DocumentOcrWeb.Endpoint.call([])
-    end
+    assert response.status == 202
+    id = Jason.decode!(response.resp_body)["id"]
+    assert Documents.get_document!(id).app_id == "44444444-4444-4444-8444-444444444444"
+  end
 
-    assert request.("ApiKey svc_read_only:wrong").status == 401
-    assert request.("ApiKey svc_read_only:secret").status == 403
+  test "invalid credentials and insufficient scopes fail closed" do
+    assert request(%{}, "ApiKey read_only:wrong").status == 401
+    assert request(%{}, "ApiKey read_only:secret").status == 403
   end
 end

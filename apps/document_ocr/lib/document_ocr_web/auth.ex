@@ -32,7 +32,7 @@ defmodule DocumentOcrWeb.Auth do
   defp deny(conn),
     do:
       conn
-      |> put_resp_content_type("application/json")
-      |> send_resp(401, ~s({"error":"unauthorized"}))
+      |> put_resp_header("www-authenticate", "ApiKey")
+      |> AikeHttp.Problem.send(401, "unauthorized")
       |> halt()
 end

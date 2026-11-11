@@ -1,8 +1,8 @@
 defmodule DocumentOcr.Documents.DocumentResult do
-  use Ecto.Schema
+  @moduledoc "Persisted OCR document domain data."
+  use DocumentOcr, :model
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @type t :: %__MODULE__{}
 
   schema "document_results" do
     belongs_to(:document, DocumentOcr.Documents.Document)

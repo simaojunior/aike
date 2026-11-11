@@ -3,7 +3,7 @@ defmodule DocumentOcr.ReprocessingTestEngine do
   def extract(bytes, opts) do
     {:ok, raw} = DocumentOcr.OCR.Fake.extract(bytes, opts)
     [name | rest] = raw["text"]
-    {:ok, %{"text" => [%{name | "text" => "NOVA PESSOA"} | rest]}}
+    {:ok, %{"text" => [%{name | "text" => "SASUKE UCHIHA"} | rest]}}
   end
 end
 
@@ -79,16 +79,15 @@ defmodule DocumentOcr.ReprocessingTest do
     Application.put_env(:document_ocr, :pipeline_version, "2026.12.0")
 
     response =
-      request(:post, "/v1/documents/#{original.id}/reprocess", %{pipeline_version: "2026.12.0"})
+      request(:post, "/v1/extractions/#{original.id}/reprocess", %{pipelineVersion: "2026.12.0"})
 
     assert response.status == 202
     current = Documents.get_document!(original.id)
 
-    assert Jason.decode!(response.resp_body) == %{
-             "id" => original.id,
-             "runId" => current.run_id,
-             "status" => "pending"
-           }
+    assert %{"id" => id, "runId" => run_id, "status" => "pending", "data" => data} =
+             Jason.decode!(response.resp_body)
+
+    assert {id, run_id, data} == {original.id, current.run_id, []}
 
     assert current.run_id != original.run_id
     assert current.request_id != original.request_id
@@ -96,7 +95,7 @@ defmodule DocumentOcr.ReprocessingTest do
     assert current.images == old_images
     assert current.result == nil
     assert Repo.aggregate(DocumentArtifact, :count) == 0
-    assert request(:get, "/v1/documents/#{original.id}").status == 200
+    assert request(:get, "/v1/extractions/#{original.id}").status == 200
 
     for worker <- @workers do
       assert {:cancel, :stale_run} = perform_job(worker, Documents.job_args(original))
@@ -109,7 +108,7 @@ defmodule DocumentOcr.ReprocessingTest do
     assert document.result.run_id == current.run_id
     assert document.result.pipeline_version == "2026.12.0"
     assert document.result.ocr_engine_version == "reprocess-1"
-    assert document.result.data["person"]["full_name"]["value"] == "NOVA PESSOA"
+    assert document.result.data["fields"]["full_name"]["value"] == "SASUKE UCHIHA"
     assert Repo.aggregate(DocumentResult, :count) == 1
     assert Repo.aggregate(DocumentArtifact, :count) == 3
 
@@ -117,11 +116,11 @@ defmodule DocumentOcr.ReprocessingTest do
              current.run_id
            ]
 
-    response = request(:get, "/v1/documents/#{original.id}")
+    response = request(:get, "/v1/extractions/#{original.id}")
     assert response.status == 200
     assert Jason.decode!(response.resp_body)["runId"] == current.run_id
 
-    assert Jason.decode!(request(:get, "/v1/documents/#{original.id}").resp_body)["runId"] ==
+    assert Jason.decode!(request(:get, "/v1/extractions/#{original.id}").resp_body)["runId"] ==
              current.run_id
 
     for worker <- @workers do
@@ -192,25 +191,25 @@ defmodule DocumentOcr.ReprocessingTest do
 
     for body <- [
           %{},
-          %{pipeline_version: nil},
-          %{pipeline_version: ""},
-          %{pipeline_version: "unknown"},
-          %{pipeline_version: 12}
+          %{pipelineVersion: nil},
+          %{pipelineVersion: ""},
+          %{pipelineVersion: "unknown"},
+          %{pipelineVersion: 12}
         ] do
-      assert request(:post, "/v1/documents/#{document.id}/reprocess", body).status == 422
+      assert request(:post, "/v1/extractions/#{document.id}/reprocess", body).status == 422
     end
 
-    assert request(:post, "/v1/documents/not-a-uuid/reprocess", %{pipeline_version: "2026.11.0"}).status ==
-             404
+    assert request(:post, "/v1/extractions/not-a-uuid/reprocess", %{pipelineVersion: "2026.11.0"}).status ==
+             422
 
-    assert request(:post, "/v1/documents/#{Ecto.UUID.generate()}/reprocess", %{
-             pipeline_version: "2026.11.0"
+    assert request(:post, "/v1/extractions/#{Ecto.UUID.generate()}/reprocess", %{
+             pipelineVersion: "2026.11.0"
            }).status == 404
 
     Application.put_env(:document_ocr, :ocr_engine_version, "missing")
 
-    assert request(:post, "/v1/documents/#{document.id}/reprocess", %{
-             pipeline_version: "2026.11.0"
+    assert request(:post, "/v1/extractions/#{document.id}/reprocess", %{
+             pipelineVersion: "2026.11.0"
            }).status == 503
 
     assert Documents.get_document!(document.id) == original

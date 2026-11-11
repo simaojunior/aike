@@ -1,6 +1,15 @@
 defmodule DocumentOcr.Documents.Processor do
-  alias DocumentOcr.Repo
+  @moduledoc """
+  Status transitions of a document run.
+
+  Every transition runs on the locked, current run (`DocumentOcr.Documents.with_current_run/2`).
+  When the status changes to a final one (`completed`, `requires_confirmation`, `rejected`
+  or `failed`), the same transaction publishes the completion for waiting requests
+  (`DocumentOcr.Completion`) and writes the webhook deliveries (`DocumentOcr.Webhooks`).
+  Repeating a transition to the same status publishes nothing.
+  """
   alias DocumentOcr.Documents.DocumentStatus
+  alias DocumentOcr.Repo
 
   def start_processing(document), do: transition(document, "processing")
   def complete(document), do: transition(document, "completed", nil, nil, "approved")
@@ -65,6 +74,17 @@ defmodule DocumentOcr.Documents.Processor do
         error_message: message
       )
       |> Repo.update()
+      |> announce(document.status)
     end)
   end
+
+  defp announce({:ok, %{status: previous}} = updated, previous), do: updated
+
+  defp announce({:ok, document} = updated, _previous) do
+    :ok = DocumentOcr.Completion.notify(document)
+    :ok = DocumentOcr.Webhooks.record(document)
+    updated
+  end
+
+  defp announce(error, _previous), do: error
 end

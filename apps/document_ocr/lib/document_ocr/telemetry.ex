@@ -23,7 +23,8 @@ defmodule DocumentOcr.Telemetry do
     queue = to_string(queue)
 
     from(job in Oban.Job,
-      where: job.queue == ^queue and job.state in ["available", "scheduled", "executing"]
+      where:
+        job.queue == ^queue and job.state in ["available", "scheduled", "executing", "retryable"]
     )
     |> DocumentOcr.Repo.aggregate(:count)
   end

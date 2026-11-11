@@ -5,7 +5,9 @@ defmodule DocumentOcr.Application do
     children = [
       DocumentOcr.Repo,
       DocumentOcrWeb.Endpoint,
-      {Oban, Application.fetch_env!(:document_ocr, Oban)}
+      {Oban, Application.fetch_env!(:document_ocr, Oban)},
+      {Registry, keys: :duplicate, name: DocumentOcr.Completion.Registry},
+      DocumentOcr.Completion
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: DocumentOcr.Supervisor)

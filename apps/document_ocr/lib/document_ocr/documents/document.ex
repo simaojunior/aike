@@ -1,9 +1,6 @@
 defmodule DocumentOcr.Documents.Document do
-  use Ecto.Schema
-  import Ecto.Changeset
-
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @moduledoc "Persisted OCR document domain data."
+  use DocumentOcr, :model
   @type t :: %__MODULE__{}
   @type attrs :: map()
 
@@ -46,7 +43,7 @@ defmodule DocumentOcr.Documents.Document do
       :country,
       :request_id
     ])
-    |> validate_inclusion(:document_type, ["cnh"])
+    |> validate_inclusion(:document_type, ["cnh", "rg", "auto"])
     |> validate_inclusion(:country, ["BR"])
     |> validate_length(:idempotency_key, max: 256)
     |> cast_assoc(:images, required: true)

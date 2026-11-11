@@ -10,19 +10,17 @@ defmodule DocumentOcrWeb.Router do
   end
 
   scope "/v1" do
-    post("/companies", DocumentOcrWeb.ProvisioningController, :create_company)
-    post("/service-accounts", DocumentOcrWeb.ProvisioningController, :create_service_account)
-  end
-
-  scope "/v1" do
     pipe_through(:ocr_write)
-    post("/documents", DocumentOcrWeb.DocumentController, :create)
-    post("/documents/:id/reprocess", DocumentOcrWeb.DocumentController, :reprocess)
-    post("/documents/:id/cancel", DocumentOcrWeb.DocumentController, :cancel)
+    post("/extractions", DocumentOcrWeb.DocumentController, :create)
+    post("/extractions/:id/reprocess", DocumentOcrWeb.DocumentController, :reprocess)
+    post("/extractions/:id/cancel", DocumentOcrWeb.DocumentController, :cancel)
+    post("/webhook-endpoints", DocumentOcrWeb.WebhookEndpointController, :create)
+    delete("/webhook-endpoints/:id", DocumentOcrWeb.WebhookEndpointController, :delete)
   end
 
   scope "/v1" do
     pipe_through(:ocr_read)
-    get("/documents/:id", DocumentOcrWeb.DocumentController, :show)
+    get("/extractions/:id", DocumentOcrWeb.DocumentController, :show)
+    get("/webhook-endpoints", DocumentOcrWeb.WebhookEndpointController, :index)
   end
 end

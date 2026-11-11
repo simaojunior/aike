@@ -11,15 +11,20 @@ defmodule DocumentOcr.MixProject do
       lockfile: "../../mix.lock",
       elixir: "~> 1.18",
       deps: [
+        {:aike_http, in_umbrella: true},
+        {:aike_observability, in_umbrella: true},
         {:aike_storage, in_umbrella: true},
         {:kyc_core, in_umbrella: true},
+        {:aike_vision, in_umbrella: true},
+        {:aike_auth, in_umbrella: true},
         {:phoenix, "~> 1.8.0"},
         {:bandit, "~> 1.6"},
         {:jason, "~> 1.4"},
         {:ecto_sql, "~> 3.13"},
         {:postgrex, "~> 0.21"},
         {:oban, "~> 2.19"},
-        {:peri, "~> 0.6.2"}
+        {:peri, "~> 0.6.2"},
+        {:req, "~> 0.5"}
       ]
     ]
   end

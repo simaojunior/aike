@@ -18,18 +18,18 @@ defmodule DocumentOcr.ValidationTest do
   test "fake extraction preserves source, normalizes and validates fields" do
     {:ok, raw} = OCR.Fake.extract("bytes", [])
     {:ok, result} = DocumentOcr.Extraction.CNH.extract(raw)
-    assert result["person"]["birth_date"]["value"] == "1990-03-12"
-    assert result["person"]["cpf"]["raw_value"] == "529.982.247-25"
+    assert result["fields"]["birth_date"]["value"] == "1990-03-12"
+    assert result["fields"]["cpf"]["raw_value"] == "529.982.247-25"
     assert Validation.outcome(Validation.validate_result(result)) == :completed
 
     bad =
-      put_in(result, ["person", "cpf", "value"], "12345678900") |> Validation.validate_result()
+      put_in(result, ["fields", "cpf", "value"], "12345678900") |> Validation.validate_result()
 
-    assert bad["person"]["cpf"]["status"] == "rejected"
+    assert bad["fields"]["cpf"]["status"] == "rejected"
     assert Validation.outcome(bad) == :rejected
-    low = put_in(result, ["person", "cpf", "confidence"], 0.65) |> Validation.validate_result()
+    low = put_in(result, ["fields", "cpf", "confidence"], 0.65) |> Validation.validate_result()
     assert Validation.outcome(low) == :requires_confirmation
-    assert low["person"]["cpf"]["status"] == "requires_confirmation"
+    assert low["fields"]["cpf"]["status"] == "requires_confirmation"
     assert {:error, :invalid_ocr_output} = DocumentOcr.Extraction.CNH.extract(%{})
   end
 
@@ -39,8 +39,8 @@ defmodule DocumentOcr.ValidationTest do
     raw = %{"text" => [name, %{cpf | "text" => "X529.982.247-25"}, birth]}
     {:ok, extracted} = DocumentOcr.Extraction.CNH.extract(raw)
     result = Validation.validate_result(extracted)
-    assert result["person"]["cpf"]["raw_value"] == "X529.982.247-25"
-    assert result["person"]["cpf"]["status"] == "rejected"
+    assert result["fields"]["cpf"]["raw_value"] == "X529.982.247-25"
+    assert result["fields"]["cpf"]["status"] == "rejected"
     assert Validation.outcome(result) == :rejected
   end
 end

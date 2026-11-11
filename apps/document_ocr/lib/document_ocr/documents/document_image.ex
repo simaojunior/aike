@@ -1,9 +1,8 @@
 defmodule DocumentOcr.Documents.DocumentImage do
-  use Ecto.Schema
-  import Ecto.Changeset
+  @moduledoc "Persisted OCR document domain data."
+  use DocumentOcr, :model
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @type t :: %__MODULE__{}
 
   schema "document_images" do
     field(:side, :string)
@@ -13,11 +12,16 @@ defmodule DocumentOcr.Documents.DocumentImage do
     timestamps(type: :utc_datetime_usec)
   end
 
+  @type attrs :: map()
+  @type changeset :: Ecto.Changeset.t(t())
+  @spec changeset(t(), attrs()) :: changeset()
   def changeset(image, attrs) do
     image
     |> cast(attrs, [:side, :source_key, :blob_id])
     |> validate_required([:side])
     |> validate_inclusion(:side, ["front", "back", "single"])
     |> unique_constraint([:document_id, :side])
+    |> foreign_key_constraint(:document_id)
+    |> foreign_key_constraint(:blob_id)
   end
 end

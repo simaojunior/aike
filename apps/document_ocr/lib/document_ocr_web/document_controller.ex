@@ -1,217 +1,71 @@
 defmodule DocumentOcrWeb.DocumentController do
+  @moduledoc "Thin document actions with centralized error responses."
   use DocumentOcrWeb, :controller
-  alias DocumentOcr.Documents
-  alias KycCore.JsonKeyFormatter
-  alias DocumentOcrWeb.DocumentJSON
+  action_fallback(DocumentOcrWeb.FallbackController)
+  alias DocumentOcr.{Completion, Documents}
+  alias DocumentOcrWeb.{DocumentInput, DocumentJSON, Preference}
 
   plug(DocumentOcrWeb.ValidateParams,
     create: &DocumentOcrWeb.Schemas.DocumentParams.create/1,
-    reprocess: &DocumentOcrWeb.Schemas.DocumentParams.reprocess/1
+    reprocess: &DocumentOcrWeb.Schemas.DocumentParams.reprocess/1,
+    show: &DocumentOcrWeb.Schemas.DocumentParams.resource/1,
+    cancel: &DocumentOcrWeb.Schemas.DocumentParams.resource/1
   )
 
   def create(conn, params) do
-    with {:ok, attrs, uploads} <- attributes(params, conn),
-         {:ok, %{document: document}} <- create_document(attrs, uploads) do
-      conn
-      |> put_status(202)
-      |> json(JsonKeyFormatter.format(DocumentJSON.accepted(document)))
-    else
-      {:error, :invalid_processing_configuration} ->
-        conn |> put_status(503) |> json(%{error: "service_unavailable"})
-
-      _ ->
-        conn |> put_status(422) |> json(%{error: "invalid_request"})
+    with {:ok, attrs, uploads} <- DocumentInput.attributes(params, conn),
+         {:ok, %{document: document} = creation} <- create_document(attrs, uploads) do
+      created(conn, document, Map.get(creation, :reused, false))
     end
   end
 
   defp create_document(attrs, []), do: Documents.create_document(attrs)
   defp create_document(attrs, uploads), do: Documents.create_document_from_uploads(attrs, uploads)
+  defp created(conn, document, true), do: render_document(conn, 200, DocumentJSON.data(document))
 
-  def reprocess(conn, %{"id" => id, "pipeline_version" => version}) do
-    request_id =
-      List.first(Plug.Conn.get_resp_header(conn, "x-request-id")) || Ecto.UUID.generate()
+  defp created(conn, document, false), do: answer(conn, document, Preference.wait(conn))
 
-    case Documents.reprocess_document(id, version, request_id) do
-      {:ok, document} ->
-        conn
-        |> put_status(202)
-        |> json(JsonKeyFormatter.format(DocumentJSON.accepted(document)))
+  defp answer(conn, document, nil), do: accepted(conn, document)
 
-      {:error, :document_not_found} ->
-        not_found(conn)
+  defp answer(conn, document, seconds) do
+    conn = put_resp_header(conn, "preference-applied", "wait=#{seconds}")
 
-      {:error, reason}
-      when reason in [:invalid_pipeline_version, :unsupported_pipeline_version] ->
-        conn |> put_status(422) |> json(%{error: "invalid_pipeline_version"})
-
-      {:error, _} ->
-        conn |> put_status(503) |> json(%{error: "service_unavailable"})
+    case Completion.await(document.id, seconds * 1_000) do
+      {:ok, finished} -> render_document(conn, 200, DocumentJSON.data(finished))
+      :timeout -> accepted(conn, Documents.get_document(document.id) || document)
     end
   end
 
-  def reprocess(conn, _), do: conn |> put_status(422) |> json(%{error: "invalid_request"})
-
-  def cancel(conn, %{"id" => id}) do
-    case Documents.cancel_document(id) do
-      {:ok, document} ->
-        json(
-          conn,
-          JsonKeyFormatter.format(
-            DocumentJSON.accepted(document)
-            |> Map.put(:error_code, document.error_code)
-          )
-        )
-
-      {:error, :document_not_found} ->
-        not_found(conn)
-
-      {:error, :not_cancellable} ->
-        conn |> put_status(409) |> json(%{error: "document_not_cancellable"})
-
-      {:error, _} ->
-        conn |> put_status(503) |> json(%{error: "service_unavailable"})
-    end
+  defp accepted(conn, document) do
+    conn
+    |> put_resp_header("location", "/v1/extractions/#{document.id}")
+    |> render_document(202, DocumentJSON.data(document))
   end
 
-  def cancel(conn, _), do: conn |> put_status(422) |> json(%{error: "invalid_request"})
+  def reprocess(conn, %{"id" => id, "pipeline_version" => version})
+      when is_binary(id) and is_binary(version) do
+    request_id = List.first(get_resp_header(conn, "x-request-id")) || Ecto.UUID.generate()
 
-  def show(conn, %{"id" => id}) do
-    case Documents.get_document(id) do
-      nil ->
-        not_found(conn)
-
-      doc ->
-        json(conn, JsonKeyFormatter.format(DocumentJSON.data(doc)))
-    end
+    with {:ok, document} <- Documents.reprocess_document(id, version, request_id),
+         do: render_document(conn, 202, DocumentJSON.data(document))
   end
 
-  defp not_found(conn), do: conn |> put_status(404) |> json(%{error: "not_found"})
+  def reprocess(_conn, _), do: {:error, :invalid_request}
 
-  defp attributes(
-         %{
-           "external_id" => external,
-           "document_type" => type,
-           "country" => country,
-           "images" => images
-         } = params,
-         conn
-       )
-       when is_list(images) do
-    app = company_id(conn, params)
-
-    with {:ok, type} <- valid_type(type),
-         {:ok, country} <- valid_country(country),
-         true <- is_binary(app),
-         {:ok, images} <- json_images(images) do
-      {:ok,
-       %{
-         app_id: app,
-         external_id: external,
-         document_type: type,
-         country: country,
-         images: images,
-         idempotency_key: idempotency_key(conn),
-         request_id: request_id(conn)
-       }, []}
-    else
-      _ -> {:error, :invalid_request}
-    end
+  def cancel(conn, %{"id" => id}) when is_binary(id) do
+    with {:ok, document} <- Documents.cancel_document(id),
+         do: render_document(conn, 200, DocumentJSON.data(document))
   end
 
-  defp attributes(
-         %{
-           "external_id" => external,
-           "document" => %{"type" => type, "country" => country},
-           "images" => images
-         } = params,
-         conn
-       )
-       when is_list(images) do
-    images = json_images!(images)
-    app = company_id(conn, params)
+  def cancel(_conn, _), do: {:error, :invalid_request}
 
-    if :invalid in images or type != "cnh" or is_nil(app) do
-      {:error, :invalid_request}
-    else
-      {:ok,
-       %{
-         app_id: app,
-         external_id: external,
-         document_type: type,
-         country: country,
-         images: images,
-         idempotency_key: idempotency_key(conn),
-         request_id:
-           List.first(Plug.Conn.get_resp_header(conn, "x-request-id")) || Ecto.UUID.generate()
-       }, []}
-    end
-  end
+  def show(conn, %{"id" => id}) when is_binary(id),
+    do: show_document(conn, Documents.get_document(id))
 
-  defp attributes(
-         %{
-           "external_id" => external,
-           "document_type" => type,
-           "country" => country
-         } = params,
-         conn
-       ) do
-    with app when is_binary(app) <- company_id(conn, params),
-         {:ok, type} <- valid_type(type),
-         {:ok, country} <- valid_country(country),
-         {:ok, uploads} <- multipart_uploads(params) do
-      {:ok,
-       %{
-         app_id: app,
-         external_id: external,
-         document_type: type,
-         country: country,
-         idempotency_key: idempotency_key(conn),
-         request_id: request_id(conn)
-       }, uploads}
-    end
-  end
+  def show(_conn, _), do: {:error, :invalid_request}
+  defp show_document(_conn, nil), do: {:error, :not_found}
+  defp show_document(conn, document), do: render_document(conn, 200, DocumentJSON.data(document))
 
-  defp attributes(_, _), do: {:error, :invalid_request}
-
-  defp json_images(images) do
-    result = json_images!(images)
-    if :invalid in result, do: {:error, :invalid_request}, else: {:ok, result}
-  end
-
-  defp json_images!(images),
-    do:
-      Enum.map(images, fn
-        %{"side" => side, "source" => %{"type" => "object_storage", "key" => key}} ->
-          %{side: side, source_key: key}
-
-        _ ->
-          :invalid
-      end)
-
-  defp company_id(conn, params), do: conn.assigns[:company_id] || params["app_id"]
-
-  defp multipart_uploads(params) do
-    uploads =
-      [{"front", Map.get(params, "image_front")}, {"back", Map.get(params, "image_back")}]
-      |> Enum.filter(fn {_side, upload} -> match?(%Plug.Upload{}, upload) end)
-      |> Enum.map(fn {side, %Plug.Upload{} = upload} ->
-        {:ok, binary} = File.read(upload.path)
-        %{side: side, binary: binary, filename: upload.filename, mime_type: upload.content_type}
-      end)
-
-    if uploads == [], do: {:error, :invalid_request}, else: {:ok, uploads}
-  end
-
-  defp valid_type("cnh"), do: {:ok, "cnh"}
-  defp valid_type("drivers_license"), do: {:ok, "cnh"}
-  defp valid_type("rg"), do: {:ok, "rg"}
-  defp valid_type(_), do: {:error, :invalid_request}
-  defp valid_country("BR"), do: {:ok, "BR"}
-  defp valid_country("BRA"), do: {:ok, "BR"}
-  defp valid_country(_), do: {:error, :invalid_request}
-
-  defp request_id(conn),
-    do: List.first(Plug.Conn.get_resp_header(conn, "x-request-id")) || Ecto.UUID.generate()
-
-  defp idempotency_key(conn), do: List.first(Plug.Conn.get_req_header(conn, "idempotency-key"))
+  defp render_document(conn, status, body),
+    do: conn |> put_status(status) |> json(body)
 end

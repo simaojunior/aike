@@ -12,7 +12,7 @@ end
 defmodule DocumentOcr.AlternativeTestExtractor do
   def extract(raw) do
     {:ok, data} = DocumentOcr.Extraction.CNH.extract(raw)
-    {:ok, update_in(data, ["person", "full_name", "value"], &("ALT " <> &1))}
+    {:ok, update_in(data, ["fields", "full_name", "value"], &("ALT " <> &1))}
   end
 end
 
@@ -88,16 +88,16 @@ defmodule DocumentOcr.ProvenanceTest do
     alternative()
 
     body = %{
-      "app_id" => "test",
-      "external_id" => "alternative",
+      "appId" => "test",
+      "externalId" => "alternative",
       "document" => %{"type" => "cnh", "country" => "BR"},
       "images" => [
-        %{"side" => "front", "source" => %{"type" => "object_storage", "key" => "fake/front.jpg"}}
+        %{"side" => "front", "image" => Base.encode64("fake/front.jpg")}
       ]
     }
 
     response =
-      conn(:post, "/v1/documents", Jason.encode!(body))
+      conn(:post, "/v1/extractions", Jason.encode!(body))
       |> put_req_header("content-type", "application/json")
       |> DocumentOcrWeb.Endpoint.call([])
 
@@ -105,7 +105,7 @@ defmodule DocumentOcr.ProvenanceTest do
     id = Jason.decode!(response.resp_body)["id"]
     assert %{success: 1, failure: 0} = Oban.drain_queue(queue: :preprocess)
     assert %{success: 1, failure: 0} = Oban.drain_queue(queue: :ocr)
-    assert_received {:alternative_engine, "fake-image-data", opts}
+    assert_received {:alternative_engine, "fake/front.jpg", opts}
     assert opts[:document_type] == "cnh"
     assert opts[:engine_version] == "alternative-1"
     assert %{success: 3, failure: 0} = Oban.drain_queue(queue: :default, with_recursion: true)
@@ -115,10 +115,10 @@ defmodule DocumentOcr.ProvenanceTest do
     assert document.result.ocr_engine_version == "alternative-1"
     assert document.result.extractor_version == "alternative-extractor-1"
     assert document.result.pipeline_version == "test-pipeline-2"
-    response = conn(:get, "/v1/documents/#{id}") |> DocumentOcrWeb.Endpoint.call([])
+    response = conn(:get, "/v1/extractions/#{id}") |> DocumentOcrWeb.Endpoint.call([])
     assert response.status == 200
 
-    assert Jason.decode!(response.resp_body)["result"]["person"]["fullName"]["value"] ==
+    assert hd(Jason.decode!(response.resp_body)["data"])["person"]["name"]["value"] ==
              "ALT ANA TESTE"
   end
 
@@ -139,10 +139,10 @@ defmodule DocumentOcr.ProvenanceTest do
       assert ProcessingConfig.metadata(stored.result) == ProcessingConfig.metadata(document)
     end
 
-    assert Documents.get_document!(first.id).result.data["person"]["full_name"]["value"] ==
-             "MARIA DA SILVA"
+    assert Documents.get_document!(first.id).result.data["fields"]["full_name"]["value"] ==
+             "NARUTO UZUMAKI"
 
-    assert Documents.get_document!(second.id).result.data["person"]["full_name"]["value"] ==
+    assert Documents.get_document!(second.id).result.data["fields"]["full_name"]["value"] ==
              "ALT ANA TESTE"
   end
 
@@ -262,21 +262,26 @@ defmodule DocumentOcr.ProvenanceTest do
     Application.put_env(:document_ocr, :ocr_engine_version, "unregistered")
 
     body = %{
-      "app_id" => "test",
-      "external_id" => "bad-config",
+      "appId" => "test",
+      "externalId" => "bad-config",
       "document" => %{"type" => "cnh", "country" => "BR"},
       "images" => [
-        %{"side" => "front", "source" => %{"type" => "object_storage", "key" => "fake/front.jpg"}}
+        %{"side" => "front", "image" => Base.encode64("fake/front.jpg")}
       ]
     }
 
     response =
-      conn(:post, "/v1/documents", Jason.encode!(body))
+      conn(:post, "/v1/extractions", Jason.encode!(body))
       |> put_req_header("content-type", "application/json")
       |> DocumentOcrWeb.Endpoint.call([])
 
     assert response.status == 503
-    assert Jason.decode!(response.resp_body) == %{"error" => "service_unavailable"}
+
+    assert %{
+             "code" => "service_unavailable",
+             "detail" => "The service is temporarily unavailable."
+           } = Jason.decode!(response.resp_body)
+
     assert Repo.aggregate(Document, :count) == 0
     assert all_enqueued(worker: Workers.PreprocessDocument) == []
   end
@@ -299,7 +304,7 @@ defmodule DocumentOcr.ProvenanceTest do
     assert current.ocr_engine == nil
     assert current.status == "completed"
 
-    response = conn(:get, "/v1/documents/#{document.id}") |> DocumentOcrWeb.Endpoint.call([])
+    response = conn(:get, "/v1/extractions/#{document.id}") |> DocumentOcrWeb.Endpoint.call([])
 
     assert response.status == 200
   end

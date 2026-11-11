@@ -10,6 +10,7 @@ defmodule DocumentOcr.Workers.Pipeline do
   }
 
   alias DocumentOcr.Documents.Processor
+  alias DocumentOcr.Extraction.Appearance
   alias DocumentOcr.Workers
   require Logger
 
@@ -30,11 +31,11 @@ defmodule DocumentOcr.Workers.Pipeline do
       nil ->
         {:cancel, :document_not_found}
 
-      %{status: "failed", error_code: "cancelled"} ->
+      %{status: "failed"} ->
         {:cancel, :document_not_active}
 
       %{run_id: ^run_id} = document ->
-        run_document(stage, document, job)
+        run_unfinished(finished?(stage, document), stage, document, job)
 
       _ ->
         {:cancel, :stale_run}
@@ -65,6 +66,20 @@ defmodule DocumentOcr.Workers.Pipeline do
       _ -> failure(document.id, document.run_id, job)
     end
   end
+
+  defp run_unfinished(true, _stage, _document, _job), do: :ok
+  defp run_unfinished(false, stage, document, job), do: run_document(stage, document, job)
+
+  defp finished?(_stage, %{status: status})
+       when status in ["completed", "rejected", "requires_confirmation"], do: true
+
+  defp finished?(:preprocess, document),
+    do: not is_nil(Documents.artifact(document, "preprocessed"))
+
+  defp finished?(:ocr, document), do: not is_nil(Documents.artifact(document, "raw_ocr"))
+  defp finished?(:extract, document), do: not is_nil(Documents.artifact(document, "extracted"))
+  defp finished?(:validate, %{result: %{run_id: run}, run_id: run}), do: true
+  defp finished?(_stage, _document), do: false
 
   defp failure(id, run_id, job, reason \\ :processing_failed) do
     # Keep external errors (which can contain identity data) out of Oban's error payload.
@@ -134,19 +149,24 @@ defmodule DocumentOcr.Workers.Pipeline do
          do: :ok
   end
 
-  defp run(:extract, %{document_type: "cnh"} = document) do
+  defp run(:extract, %{document_type: "auto"} = document) do
     %{data: %{"images" => images}} = Documents.artifact(document, "raw_ocr")
-    first = Enum.min_by(images, &image_priority(&1["side"]))
+    lines = merge_outputs(images)
 
-    with {:ok, data} <- Extraction.extract(first["output"], document),
-         :ok <-
-           Documents.save_artifact_and_enqueue(
-             document,
-             "extracted",
-             data,
-             Workers.ValidateFields
-           ),
-         do: :ok
+    case detect_type(lines) do
+      nil ->
+        with {:ok, _} <-
+               Processor.fail(document, "unrecognized_document", "Document type not recognized"),
+             do: {:cancel, :unrecognized_document}
+
+      type ->
+        extract(%{document | document_type: type}, lines)
+    end
+  end
+
+  defp run(:extract, %{document_type: type} = document) when type in ["cnh", "rg"] do
+    %{data: %{"images" => images}} = Documents.artifact(document, "raw_ocr")
+    extract(document, merge_outputs(images))
   end
 
   defp run(:extract, _document), do: {:error, :unsupported_document_type}
@@ -186,45 +206,114 @@ defmodule DocumentOcr.Workers.Pipeline do
     document.images
     |> Enum.sort_by(&image_priority(&1.side))
     |> Enum.reduce_while({:ok, []}, fn image, {:ok, acc} ->
-      case DocumentOcr.ExternalCall.run(
-             fn -> load_image_bytes(image) end,
-             Application.get_env(:document_ocr, :storage_timeout_ms, 5_000),
-             Application.get_env(:document_ocr, :external_call_mode, :async)
-           ) do
-        {:ok, bytes} ->
-          {:cont, {:ok, acc ++ [%{"side" => image.side, "bytes" => Base.encode64(bytes)}]}}
-
-        {:error, :timeout} ->
-          {:halt, {:error, :timeout}}
-
-        _ ->
-          {:halt, {:error, :storage_failed}}
+      case read_image(image) do
+        {:ok, _bytes} -> {:cont, {:ok, acc ++ [%{"side" => image.side, "image_id" => image.id}]}}
+        error -> {:halt, error}
       end
     end)
   end
 
+  defp read_image(image) do
+    case DocumentOcr.ExternalCall.run(
+           fn -> load_image_bytes(image) end,
+           Application.get_env(:document_ocr, :storage_timeout_ms, 5_000),
+           Application.get_env(:document_ocr, :external_call_mode, :async)
+         ) do
+      {:ok, bytes} -> verify(image, bytes)
+      {:error, :timeout} -> {:error, :timeout}
+      _ -> {:error, :storage_failed}
+    end
+  end
+
+  defp verify(%{blob: %AikeStorage.Blob{sha256: sha256}}, bytes) do
+    if Base.encode16(:crypto.hash(:sha256, bytes), case: :lower) == sha256,
+      do: {:ok, bytes},
+      else: {:error, :storage_failed}
+  end
+
+  defp verify(_image, bytes), do: {:ok, bytes}
+
+  defp image_bytes(%{"bytes" => encoded}, _document), do: Base.decode64(encoded)
+
+  defp image_bytes(%{"image_id" => id}, document) do
+    case Enum.find(document.images, &(&1.id == id)) do
+      nil -> {:error, :storage_failed}
+      image -> read_image(image)
+    end
+  end
+
   defp extract_images(images, document) do
     Enum.reduce_while(images, {:ok, []}, fn image, {:ok, acc} ->
-      case DocumentOcr.ExternalCall.run(
-             fn ->
-               OCR.extract(
-                 Base.decode64!(image["bytes"]),
-                 [document_type: document.document_type],
-                 document
-               )
-             end,
-             Application.get_env(:document_ocr, :ocr_timeout_ms, 15_000),
-             Application.get_env(:document_ocr, :external_call_mode, :async)
-           ) do
-        {:ok, output} -> {:cont, {:ok, acc ++ [%{"side" => image["side"], "output" => output}]}}
+      with {:ok, bytes} <- image_bytes(image, document),
+           {:ok, output} <- ocr(bytes, document) do
+        {:cont, {:ok, acc ++ [%{"side" => image["side"], "output" => output}]}}
+      else
         {:error, :timeout} -> {:halt, {:error, :timeout}}
+        {:error, :storage_failed} -> {:halt, {:error, :storage_failed}}
         _ -> {:halt, {:error, :ocr_failed}}
       end
     end)
   end
 
+  defp ocr(bytes, document) do
+    DocumentOcr.ExternalCall.run(
+      fn -> OCR.extract(bytes, [document_type: document.document_type], document) end,
+      Application.get_env(:document_ocr, :ocr_timeout_ms, 15_000),
+      Application.get_env(:document_ocr, :external_call_mode, :async)
+    )
+  end
+
   defp load_image_bytes(%{blob: %AikeStorage.Blob{} = blob}), do: AikeStorage.Blobs.get(blob)
   defp load_image_bytes(%{source_key: key}), do: StorageAdapter.get(key)
+
+  defp extract(document, lines) do
+    with {:ok, data} <- Extraction.extract(lines, document) do
+      data = describe(data, document, lines)
+      Documents.save_artifact_and_enqueue(document, "extracted", data, Workers.ValidateFields)
+    end
+  end
+
+  defp describe(%{"document" => described} = data, document, lines) do
+    appearance =
+      Appearance.describe(
+        document.document_type,
+        Enum.map(document.images, & &1.side),
+        text(lines)
+      )
+
+    %{data | "document" => Map.merge(described, appearance)}
+  end
+
+  defp describe(data, _document, _lines), do: data
+
+  defp text(%{"text" => lines}),
+    do: Enum.map_join(lines, " ", &((is_map(&1) && &1["text"]) || ""))
+
+  defp detect_type(lines) do
+    case AikeVision.DocumentMarkers.analyze(text(lines)).type do
+      :unknown -> nil
+      type -> Atom.to_string(type)
+    end
+  end
+
+  defp merge_outputs(images) do
+    lines =
+      images
+      |> Enum.sort_by(&image_priority(&1["side"]))
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {image, index} -> image_lines(image["output"], index) end)
+
+    %{"text" => lines}
+  end
+
+  defp image_lines(%{"text" => lines}, index) when is_list(lines) do
+    Enum.map(lines, fn
+      %{"source" => source} = line -> %{line | "source" => "#{index}:#{source}"}
+      line -> line
+    end)
+  end
+
+  defp image_lines(_, _), do: [:invalid_output]
 
   defp image_priority("front"), do: 0
   defp image_priority("single"), do: 1

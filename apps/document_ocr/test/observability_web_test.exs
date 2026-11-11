@@ -5,7 +5,7 @@ defmodule DocumentOcrWeb.ObservabilityTest do
 
   test "propagates an incoming request id" do
     conn =
-      conn(:get, "/v1/documents")
+      conn(:get, "/v1/extractions")
       |> put_req_header("x-request-id", "req-42")
       |> DocumentOcrWeb.Observability.call([])
 
@@ -14,7 +14,7 @@ defmodule DocumentOcrWeb.ObservabilityTest do
   end
 
   test "generates a request id when the client omits it" do
-    conn = DocumentOcrWeb.Observability.call(conn(:get, "/v1/documents"), [])
+    conn = DocumentOcrWeb.Observability.call(conn(:get, "/v1/extractions"), [])
     assert [request_id] = get_resp_header(conn, "x-request-id")
     assert {:ok, _uuid} = Ecto.UUID.cast(request_id)
   end

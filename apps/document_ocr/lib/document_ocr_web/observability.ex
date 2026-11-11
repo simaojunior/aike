@@ -1,7 +1,7 @@
 defmodule DocumentOcrWeb.Observability do
   import Plug.Conn
   require Logger
-  alias KycCore.Observability, as: Obs
+  alias AikeObservability, as: Obs
 
   def init(opts), do: opts
 

@@ -10,7 +10,7 @@ defmodule DocumentOcr.TelemetryTest do
 
     :telemetry.attach(ref, [:aike, :document, :stage], handler, nil)
 
-    document = %{id: "document-id", app_id: "acme"}
+    document = %{id: "document-id", app_id: "konoha"}
     assert :ok = DocumentOcr.Telemetry.execute(:ocr, document, fn -> :ok end)
 
     assert_receive {^ref, [:aike, :document, :stage], %{duration: duration},
