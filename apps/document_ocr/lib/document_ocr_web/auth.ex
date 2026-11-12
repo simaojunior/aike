@@ -21,7 +21,8 @@ defmodule DocumentOcrWeb.Auth do
       match?(["ApiKey " <> _], get_req_header(conn, "authorization"))
   end
 
-  defp legacy_call(conn), do: legacy_call(conn, Application.get_env(:document_ocr, :service_token))
+  defp legacy_call(conn),
+    do: legacy_call(conn, Application.get_env(:document_ocr, :service_token))
 
   defp legacy_call(conn, nil) do
     if Application.get_env(:document_ocr, :auth_required, false), do: deny(conn), else: conn

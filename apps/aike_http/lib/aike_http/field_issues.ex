@@ -59,6 +59,8 @@ defmodule AikeHttp.FieldIssues do
   defp coded_description("invalid_images" = code, _),
     do: {code, "Provide one or two images with distinct sides."}
 
-  defp coded_description("too_many_bytes", _), do: {"too_long", "Must contain at most 1024 bytes."}
+  defp coded_description("too_many_bytes", _),
+    do: {"too_long", "Must contain at most 1024 bytes."}
+
   defp coded_description(_, _), do: {"invalid_value", "This field has an invalid value."}
 end

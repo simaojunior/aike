@@ -90,6 +90,7 @@ defmodule DocumentOcr.ReprocessingConcurrencyTest do
     try do
       assert_receive {:restart_connection, restart_backend}, 2000
       refute worker_backend == restart_backend
+
       refute unboxed(fn ->
                Repo.query!("SELECT $1::integer = ANY(pg_blocking_pids($2::integer))", [
                  worker_backend,

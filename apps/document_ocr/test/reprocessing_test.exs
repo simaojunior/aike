@@ -225,6 +225,7 @@ defmodule DocumentOcr.ReprocessingTest do
     document = create()
     drain()
     before_restart = Documents.get_document!(document.id)
+
     assert {:error, :abort} =
              Repo.transaction(fn ->
                assert {:ok, _} = Documents.reprocess_document(document.id, "2026.11.0")
@@ -253,6 +254,7 @@ defmodule DocumentOcr.ReprocessingTest do
     document = create()
     drain()
     original = Documents.get_document!(document.id)
+
     Repo.query!(
       "ALTER TABLE oban_jobs ADD CONSTRAINT kyc_test_enqueue_failure CHECK (args->>'document_id' <> '#{document.id}') NOT VALID"
     )

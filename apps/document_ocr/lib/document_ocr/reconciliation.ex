@@ -19,25 +19,25 @@ defmodule DocumentOcr.Reconciliation do
     cutoff = DateTime.add(DateTime.utc_now(), -3600)
 
     from(document in Document,
-        left_join: job in Oban.Job,
-        on:
-          fragment("?->>'document_id' = ?::text", job.args, document.id) and
-            fragment("?->>'run_id' = ?::text", job.args, document.run_id),
-        left_join: active in Oban.Job,
-        on:
-          fragment("?->>'document_id' = ?::text", active.args, document.id) and
-            fragment("?->>'run_id' = ?::text", active.args, document.run_id) and
-            active.worker in ^@workers and active.state in ^@active,
-        where:
-          document.status in ["pending", "processing"] and is_nil(active.id) and
-            ((job.state in ["discarded", "cancelled"] and job.worker in ^@workers) or
-               document.updated_at < ^cutoff),
-        distinct: true,
-        order_by: document.id,
-        limit: ^limit,
-        select: {document.id, document.run_id}
-      )
-      |> Repo.all()
+      left_join: job in Oban.Job,
+      on:
+        fragment("?->>'document_id' = ?::text", job.args, document.id) and
+          fragment("?->>'run_id' = ?::text", job.args, document.run_id),
+      left_join: active in Oban.Job,
+      on:
+        fragment("?->>'document_id' = ?::text", active.args, document.id) and
+          fragment("?->>'run_id' = ?::text", active.args, document.run_id) and
+          active.worker in ^@workers and active.state in ^@active,
+      where:
+        document.status in ["pending", "processing"] and is_nil(active.id) and
+          ((job.state in ["discarded", "cancelled"] and job.worker in ^@workers) or
+             document.updated_at < ^cutoff),
+      distinct: true,
+      order_by: document.id,
+      limit: ^limit,
+      select: {document.id, document.run_id}
+    )
+    |> Repo.all()
   end
 
   defp repair_candidates(candidates) do

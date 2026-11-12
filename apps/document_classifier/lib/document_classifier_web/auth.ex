@@ -18,10 +18,13 @@ defmodule DocumentClassifierWeb.Auth do
       match?(["ApiKey " <> _], get_req_header(conn, "authorization"))
   end
 
-  defp legacy_call(conn), do: legacy_call(conn, Application.get_env(:document_classifier, :service_token))
+  defp legacy_call(conn),
+    do: legacy_call(conn, Application.get_env(:document_classifier, :service_token))
 
   defp legacy_call(conn, nil) do
-    if Application.get_env(:document_classifier, :auth_required, false), do: deny(conn), else: conn
+    if Application.get_env(:document_classifier, :auth_required, false),
+      do: deny(conn),
+      else: conn
   end
 
   defp legacy_call(conn, token) when is_binary(token) and byte_size(token) > 0,
