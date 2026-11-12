@@ -97,7 +97,7 @@ defmodule Backoffice.ProvisioningApiTest do
     company = Repo.insert!(%Company{name: "Konoha"})
 
     body = %{
-      "company_id" => company.id,
+      "companyId" => company.id,
       "name" => "Konoha development",
       "scopes" => ["ocr:write", "ocr:read"]
     }
@@ -125,7 +125,7 @@ defmodule Backoffice.ProvisioningApiTest do
         :post,
         "/v1/service-accounts",
         Jason.encode!(%{
-          "company_id" => Ecto.UUID.generate(),
+          "companyId" => Ecto.UUID.generate(),
           "name" => "Unknown",
           "scopes" => ["ocr:read"]
         })

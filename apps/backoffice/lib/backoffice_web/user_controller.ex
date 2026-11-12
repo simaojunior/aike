@@ -21,7 +21,7 @@ defmodule BackofficeWeb.UserController do
       name: name,
       password: password,
       role: params["role"],
-      company_id: params["companyId"]
+      company_id: params["company_id"]
     }
 
     with {:ok, user} <- Accounts.create_user(conn.assigns.identity.user, attrs),

@@ -28,10 +28,10 @@ defmodule BackofficeWeb.ProvisioningController do
   def create_service_account(conn, %{"name" => name, "scopes" => scopes} = params)
       when is_binary(name) and is_list(scopes) do
     attrs = %{
-      company_id: params["company_id"] || params["companyId"],
+      company_id: params["company_id"],
       name: name,
       scopes: scopes,
-      account_id: params["account_id"] || params["accountId"]
+      account_id: params["account_id"]
     }
 
     with {:ok, {account, secret}} <-

@@ -17,20 +17,26 @@ defmodule BackofficeWeb.AuthController do
   alias BackofficeWeb.AuthJSON
   alias KycCore.JsonKeyFormatter
 
-  def bootstrap(conn, params) do
-    with {:ok, user} <-
-           Accounts.bootstrap(%{
-             email: params["email"],
-             password: params["password"],
-             name: params["name"],
-             company_name: params["companyName"] || params["company_name"]
-           }) do
+  def bootstrap(
+        conn,
+        %{
+          "email" => email,
+          "password" => password,
+          "name" => name,
+          "company_name" => company_name
+        }
+      ) do
+    attrs = %{email: email, password: password, name: name, company_name: company_name}
+
+    with {:ok, user} <- Accounts.bootstrap(attrs) do
       conn
       |> put_resp_header("location", "/v1/users/#{user.id}")
       |> put_status(:created)
       |> respond(AuthJSON.user(user))
     end
   end
+
+  def bootstrap(_conn, _), do: {:error, :bad_request}
 
   def login(conn, %{"email" => email, "password" => password})
       when is_binary(email) and is_binary(password) do
@@ -39,7 +45,7 @@ defmodule BackofficeWeb.AuthController do
 
   def login(_conn, _), do: {:error, :bad_request}
 
-  def refresh(conn, %{"refreshToken" => token}) when is_binary(token) do
+  def refresh(conn, %{"refresh_token" => token}) when is_binary(token) do
     with {:ok, pair} <- Sessions.refresh(token), do: respond(conn, AuthJSON.session(pair))
   end
 
@@ -59,7 +65,7 @@ defmodule BackofficeWeb.AuthController do
          do: respond(conn, AuthJSON.ok())
   end
 
-  def password(conn, %{"currentPassword" => current, "newPassword" => password})
+  def password(conn, %{"current_password" => current, "new_password" => password})
       when is_binary(current) and is_binary(password) do
     with {:ok, :ok} <- Sessions.change_password(conn.assigns.identity.user, current, password),
          do: respond(conn, AuthJSON.ok())

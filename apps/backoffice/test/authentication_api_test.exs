@@ -17,6 +17,49 @@ defmodule Backoffice.AuthenticationApiTest do
     :ok
   end
 
+  test "bootstrap rejects snake_case field names" do
+    body = %{
+      company_name: "Owner",
+      name: "Admin",
+      email: "admin@example.test",
+      password: @password
+    }
+
+    response = request(:post, "/v1/auth/bootstrap", body, @bootstrap)
+
+    assert response.status == 422
+    assert Jason.decode!(response.resp_body)["code"] == "validation"
+  end
+
+  test "a platform administrator creates a user in the company named by companyId" do
+    {:ok, owner} =
+      Accounts.bootstrap(%{
+        company_name: "Owner",
+        name: "Admin",
+        email: "admin@example.test",
+        password: @password
+      })
+
+    {:ok, company} = Backoffice.Provisioning.create_company(Repo, %{name: "Tenant"})
+    {:ok, pair} = Sessions.login(owner.email, @password)
+
+    response =
+      request(
+        :post,
+        "/v1/users",
+        %{
+          name: "Sakura Haruno",
+          email: "sakura@example.test",
+          password: @password,
+          companyId: company.id
+        },
+        pair.access_token
+      )
+
+    assert response.status == 201
+    assert Jason.decode!(response.resp_body)["companyId"] == company.id
+  end
+
   test "bootstrap credential only bootstraps once and never authorizes normal APIs" do
     body = %{
       companyName: "Owner",
