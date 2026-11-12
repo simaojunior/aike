@@ -9,7 +9,7 @@ defmodule Aike.MixProject do
       deps: [
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
         {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-        {:peri, "~> 0.6.2"}
+        {:peri, "~> 0.12.0"}
       ],
       aliases: [
         quality: [

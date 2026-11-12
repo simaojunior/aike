@@ -14,7 +14,7 @@ defmodule AikeHttp.MixProject do
         {:kyc_core, in_umbrella: true},
         {:plug, "~> 1.18"},
         {:jason, "~> 1.4"},
-        {:peri, "~> 0.6.2"}
+        {:peri, "~> 0.12.0"}
       ]
     ]
   end

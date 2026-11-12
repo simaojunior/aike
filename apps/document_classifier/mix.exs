@@ -19,7 +19,7 @@ defmodule DocumentClassifier.MixProject do
         {:phoenix, "~> 1.8.0"},
         {:bandit, "~> 1.6"},
         {:jason, "~> 1.4"},
-        {:peri, "~> 0.6.2"}
+        {:peri, "~> 0.12.0"}
       ]
     ]
   end
