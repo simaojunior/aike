@@ -23,7 +23,7 @@ defmodule Biometrics.MixProject do
         {:ecto_sql, "~> 3.13"},
         {:postgrex, "~> 0.21"},
         {:oban, "~> 2.19"},
-        {:peri, "~> 0.6.2"}
+        {:peri, "~> 0.12.0"}
       ]
     ]
   end
